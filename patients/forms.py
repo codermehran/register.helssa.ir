@@ -3,6 +3,9 @@ from django import forms
 from .models import Patient
 
 
+DUPLICATE_MOBILE_ERROR = "این شماره موبایل قبلاً در سامانه ثبت شده است."
+
+
 class PatientRegistrationForm(forms.ModelForm):
     first_name = forms.CharField(
         label="نام",
@@ -46,6 +49,6 @@ class PatientRegistrationForm(forms.ModelForm):
             raise forms.ValidationError("شماره موبایل باید با 09 شروع شود.")
 
         if Patient.objects.filter(mobile=mobile).exists():
-            raise forms.ValidationError("این شماره موبایل قبلاً ثبت شده است.")
+            raise forms.ValidationError(DUPLICATE_MOBILE_ERROR)
 
         return mobile
