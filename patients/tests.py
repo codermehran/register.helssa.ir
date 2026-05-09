@@ -113,6 +113,19 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(response, "شماره موبایل")
         self.assertContains(response, "ارسال فرم")
 
+    def test_register_template_uses_rtl_persian_html_attributes(self):
+        response = self.client.get(reverse("patients:register"))
+
+        self.assertContains(response, '<html lang="fa" dir="rtl">')
+
+    def test_register_form_uses_persian_placeholders_and_ltr_mobile(self):
+        response = self.client.get(reverse("patients:register"))
+
+        self.assertContains(response, 'placeholder="مثلاً علی"')
+        self.assertContains(response, 'placeholder="مثلاً رضایی"')
+        self.assertContains(response, 'dir="ltr"')
+        self.assertContains(response, 'placeholder="مثلاً 09123456789"')
+
     def test_invalid_post_preserves_submitted_values(self):
         response = self.client.post(
             reverse("patients:register"),

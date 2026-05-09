@@ -24,7 +24,7 @@ html {
 body {
     min-height: 100vh;
     margin: 0;
-    font-family: Tahoma, Arial, sans-serif;
+    font-family: Vazirmatn, Tahoma, Arial, sans-serif;
     line-height: 1.7;
     background:
         radial-gradient(circle at top right, rgba(20, 184, 166, 0.14), transparent 32rem),
