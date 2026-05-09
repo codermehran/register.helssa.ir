@@ -1,8 +1,16 @@
+from unittest.mock import patch
+
+from django.db import DatabaseError, IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 
-from .forms import PatientRegistrationForm
+from .forms import DUPLICATE_MOBILE_ERROR, PatientRegistrationForm
 from .models import Patient
+
+
+class PatientModelTests(TestCase):
+    def test_mobile_field_is_unique(self):
+        self.assertTrue(Patient._meta.get_field("mobile").unique)
 
 
 class PatientRegistrationFormTests(TestCase):
@@ -79,7 +87,7 @@ class PatientRegistrationFormTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertEqual(
             form.errors["mobile"],
-            ["این شماره موبایل قبلاً ثبت شده است."],
+            [DUPLICATE_MOBILE_ERROR],
         )
 
     def test_required_field_messages_are_persian(self):
@@ -177,3 +185,48 @@ class RegisterPatientViewTests(TestCase):
         self.assertFalse(Patient.objects.exists())
         self.assertContains(response, "شماره موبایل باید با 09 شروع شود.")
         self.assertTrue(response.context["form"].is_bound)
+
+    def test_post_handles_duplicate_mobile_integrity_error(self):
+        with patch.object(
+            PatientRegistrationForm,
+            "save",
+            side_effect=IntegrityError(
+                "UNIQUE constraint failed: patients_patient.mobile"
+            ),
+        ):
+            response = self.client.post(
+                reverse("patients:register"),
+                data={
+                    "first_name": "Ali",
+                    "last_name": "Ahmadi",
+                    "mobile": "09123456789",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Patient.objects.exists())
+        self.assertContains(response, DUPLICATE_MOBILE_ERROR)
+        self.assertEqual(
+            response.context["form"].errors["mobile"], [DUPLICATE_MOBILE_ERROR]
+        )
+
+    def test_post_handles_generic_database_save_error(self):
+        with patch.object(
+            PatientRegistrationForm,
+            "save",
+            side_effect=DatabaseError("database unavailable"),
+        ):
+            response = self.client.post(
+                reverse("patients:register"),
+                data={
+                    "first_name": "Ali",
+                    "last_name": "Ahmadi",
+                    "mobile": "09123456789",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Patient.objects.exists())
+        self.assertContains(
+            response, "در ذخیره‌سازی اطلاعات مشکلی رخ داد. لطفاً دوباره تلاش کنید."
+        )
