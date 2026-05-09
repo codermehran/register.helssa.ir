@@ -7,16 +7,25 @@ class PatientRegistrationForm(forms.ModelForm):
     first_name = forms.CharField(
         label="نام",
         required=True,
+        widget=forms.TextInput(attrs={"placeholder": "مثلاً علی"}),
         error_messages={"required": "وارد کردن نام الزامی است."},
     )
     last_name = forms.CharField(
         label="نام خانوادگی",
         required=True,
+        widget=forms.TextInput(attrs={"placeholder": "مثلاً رضایی"}),
         error_messages={"required": "وارد کردن نام خانوادگی الزامی است."},
     )
     mobile = forms.CharField(
         label="شماره موبایل",
         required=True,
+        widget=forms.TextInput(
+            attrs={
+                "dir": "ltr",
+                "inputmode": "numeric",
+                "placeholder": "مثلاً 09123456789",
+            }
+        ),
         error_messages={"required": "وارد کردن شماره موبایل الزامی است."},
     )
 
