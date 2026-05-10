@@ -26,19 +26,27 @@
             </div>
 
             {% if messages %}
-                <ul class="messages" aria-label="پیام‌های فرم">
+                <div class="message-stack" aria-label="پیام‌های فرم">
                     {% for message in messages %}
-                        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                        <div class="message-card{% if message.tags %} message-card--{{ message.tags }}{% endif %}" role="status">
+                            <span class="message-card__icon" aria-hidden="true">
+                                {% if "error" in message.tags or "warning" in message.tags %}✕{% else %}✓{% endif %}
+                            </span>
+                            <p>{{ message }}</p>
+                        </div>
                     {% endfor %}
-                </ul>
+                </div>
             {% endif %}
 
             {% if form.non_field_errors %}
-                <ul class="field-errors" aria-label="خطاهای فرم">
-                    {% for error in form.non_field_errors %}
-                        <li>{{ error }}</li>
-                    {% endfor %}
-                </ul>
+                <div class="form-alert form-alert--error" role="alert" aria-label="خطاهای فرم">
+                    <span class="form-alert__icon" aria-hidden="true">!</span>
+                    <ul class="field-errors field-errors--alert">
+                        {% for error in form.non_field_errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
             {% endif %}
 
             <form class="registration-form" method="post" novalidate>

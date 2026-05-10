@@ -37,7 +37,7 @@ class PatientRegistrationFormTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertEqual(
             form.errors["mobile"],
-            ["شماره موبایل باید ۱۱ رقم باشد."],
+            ["شماره را ۱۱ رقمی وارد کنید."],
         )
 
     def test_mobile_must_contain_only_digits(self):
@@ -52,7 +52,7 @@ class PatientRegistrationFormTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertEqual(
             form.errors["mobile"],
-            ["شماره موبایل فقط باید شامل عدد باشد."],
+            ["فقط عدد وارد کنید."],
         )
 
     def test_mobile_must_start_with_09(self):
@@ -67,7 +67,7 @@ class PatientRegistrationFormTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertEqual(
             form.errors["mobile"],
-            ["شماره موبایل باید با 09 شروع شود."],
+            ["شماره موبایل با 09 شروع شود."],
         )
 
     def test_mobile_must_be_unique(self):
@@ -94,12 +94,12 @@ class PatientRegistrationFormTests(TestCase):
         form = PatientRegistrationForm(data={})
 
         self.assertFalse(form.is_valid())
-        self.assertEqual(form.errors["first_name"], ["وارد کردن نام الزامی است."])
+        self.assertEqual(form.errors["first_name"], ["نام را وارد کنید."])
         self.assertEqual(
-            form.errors["last_name"], ["وارد کردن نام خانوادگی الزامی است."]
+            form.errors["last_name"], ["نام خانوادگی را وارد کنید."]
         )
         self.assertEqual(
-            form.errors["mobile"], ["وارد کردن شماره موبایل الزامی است."]
+            form.errors["mobile"], ["شماره موبایل را وارد کنید."]
         )
 
 
@@ -138,6 +138,39 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(response, 'inputmode="numeric"')
         self.assertContains(response, 'maxlength="11"')
         self.assertContains(response, 'placeholder="مثلاً 09123456789"')
+
+    def test_register_template_styles_messages_as_alert_cards(self):
+        response = self.client.get(reverse("patients:register"))
+
+        self.assertContains(response, 'class="message-stack"', count=0)
+
+        response = self.client.post(
+            reverse("patients:register"),
+            data={
+                "first_name": "Ali",
+                "last_name": "Ahmadi",
+                "mobile": "09123456789",
+            },
+            follow=True,
+        )
+
+        self.assertContains(response, 'class="message-stack"')
+        self.assertContains(response, 'message-card message-card--success')
+        self.assertContains(response, 'class="message-card__icon"')
+        self.assertContains(response, "✓")
+
+    def test_field_errors_render_below_each_field(self):
+        response = self.client.post(
+            reverse("patients:register"),
+            data={"first_name": "", "last_name": "", "mobile": "08123456789"},
+        )
+
+        self.assertContains(response, 'aria-label="خطاهای نام"')
+        self.assertContains(response, "نام را وارد کنید.")
+        self.assertContains(response, 'aria-label="خطاهای نام خانوادگی"')
+        self.assertContains(response, "نام خانوادگی را وارد کنید.")
+        self.assertContains(response, 'aria-label="خطاهای شماره موبایل"')
+        self.assertContains(response, "شماره موبایل با 09 شروع شود.")
 
     def test_invalid_post_preserves_submitted_values(self):
         response = self.client.post(
@@ -188,7 +221,7 @@ class RegisterPatientViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Patient.objects.exists())
-        self.assertContains(response, "شماره موبایل باید با 09 شروع شود.")
+        self.assertContains(response, "شماره موبایل با 09 شروع شود.")
         self.assertTrue(response.context["form"].is_bound)
 
     def test_post_handles_duplicate_mobile_integrity_error(self):

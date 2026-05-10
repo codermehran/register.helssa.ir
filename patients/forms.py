@@ -3,7 +3,7 @@ from django import forms
 from .models import Patient
 
 
-DUPLICATE_MOBILE_ERROR = "این شماره موبایل قبلاً در سامانه ثبت شده است."
+DUPLICATE_MOBILE_ERROR = "این شماره قبلاً ثبت شده است."
 
 
 class PatientRegistrationForm(forms.ModelForm):
@@ -13,7 +13,7 @@ class PatientRegistrationForm(forms.ModelForm):
         widget=forms.TextInput(
             attrs={"autocomplete": "given-name", "placeholder": "مثلاً علی"}
         ),
-        error_messages={"required": "وارد کردن نام الزامی است."},
+        error_messages={"required": "نام را وارد کنید."},
     )
     last_name = forms.CharField(
         label="نام خانوادگی",
@@ -21,7 +21,7 @@ class PatientRegistrationForm(forms.ModelForm):
         widget=forms.TextInput(
             attrs={"autocomplete": "family-name", "placeholder": "مثلاً رضایی"}
         ),
-        error_messages={"required": "وارد کردن نام خانوادگی الزامی است."},
+        error_messages={"required": "نام خانوادگی را وارد کنید."},
     )
     mobile = forms.CharField(
         label="شماره موبایل",
@@ -35,7 +35,7 @@ class PatientRegistrationForm(forms.ModelForm):
                 "placeholder": "مثلاً 09123456789",
             }
         ),
-        error_messages={"required": "وارد کردن شماره موبایل الزامی است."},
+        error_messages={"required": "شماره موبایل را وارد کنید."},
     )
 
     class Meta:
@@ -46,13 +46,13 @@ class PatientRegistrationForm(forms.ModelForm):
         mobile = self.cleaned_data["mobile"]
 
         if len(mobile) != 11:
-            raise forms.ValidationError("شماره موبایل باید ۱۱ رقم باشد.")
+            raise forms.ValidationError("شماره را ۱۱ رقمی وارد کنید.")
 
         if not mobile.isdigit():
-            raise forms.ValidationError("شماره موبایل فقط باید شامل عدد باشد.")
+            raise forms.ValidationError("فقط عدد وارد کنید.")
 
         if not mobile.startswith("09"):
-            raise forms.ValidationError("شماره موبایل باید با 09 شروع شود.")
+            raise forms.ValidationError("شماره موبایل با 09 شروع شود.")
 
         if Patient.objects.filter(mobile=mobile).exists():
             raise forms.ValidationError(DUPLICATE_MOBILE_ERROR)
