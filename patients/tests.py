@@ -129,9 +129,14 @@ class RegisterPatientViewTests(TestCase):
     def test_register_form_uses_persian_placeholders_and_ltr_mobile(self):
         response = self.client.get(reverse("patients:register"))
 
+        self.assertContains(response, 'autocomplete="given-name"')
         self.assertContains(response, 'placeholder="مثلاً علی"')
+        self.assertContains(response, 'autocomplete="family-name"')
         self.assertContains(response, 'placeholder="مثلاً رضایی"')
+        self.assertContains(response, 'autocomplete="tel"')
         self.assertContains(response, 'dir="ltr"')
+        self.assertContains(response, 'inputmode="numeric"')
+        self.assertContains(response, 'maxlength="11"')
         self.assertContains(response, 'placeholder="مثلاً 09123456789"')
 
     def test_invalid_post_preserves_submitted_values(self):

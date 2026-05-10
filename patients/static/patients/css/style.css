@@ -262,10 +262,26 @@ body {
         margin-bottom: 1.25rem;
     }
 
-    .form-card input,
+    .registration-form {
+        gap: 1.35rem;
+    }
+
+    .form-field {
+        gap: 0.65rem;
+    }
+
+    .form-card input {
+        min-height: 3.45rem;
+        padding: 1rem 1.05rem;
+        border-radius: 0.9rem;
+    }
+
     .form-card button {
-        min-height: 3.15rem;
-        border-radius: 0.85rem;
+        width: 100%;
+        min-height: 3.45rem;
+        margin-top: 0.75rem;
+        padding: 1rem 1.25rem;
+        border-radius: 0.9rem;
     }
 
     .help-card {
