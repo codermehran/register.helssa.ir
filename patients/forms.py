@@ -10,13 +10,17 @@ class PatientRegistrationForm(forms.ModelForm):
     first_name = forms.CharField(
         label="نام",
         required=True,
-        widget=forms.TextInput(attrs={"placeholder": "مثلاً علی"}),
+        widget=forms.TextInput(
+            attrs={"autocomplete": "given-name", "placeholder": "مثلاً علی"}
+        ),
         error_messages={"required": "وارد کردن نام الزامی است."},
     )
     last_name = forms.CharField(
         label="نام خانوادگی",
         required=True,
-        widget=forms.TextInput(attrs={"placeholder": "مثلاً رضایی"}),
+        widget=forms.TextInput(
+            attrs={"autocomplete": "family-name", "placeholder": "مثلاً رضایی"}
+        ),
         error_messages={"required": "وارد کردن نام خانوادگی الزامی است."},
     )
     mobile = forms.CharField(
@@ -24,8 +28,10 @@ class PatientRegistrationForm(forms.ModelForm):
         required=True,
         widget=forms.TextInput(
             attrs={
+                "autocomplete": "tel",
                 "dir": "ltr",
                 "inputmode": "numeric",
+                "maxlength": "11",
                 "placeholder": "مثلاً 09123456789",
             }
         ),
