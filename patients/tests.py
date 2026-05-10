@@ -137,6 +137,23 @@ class RegisterPatientViewTests(TestCase):
         self.assertIn("cursor: not-allowed", css)
         self.assertIn("--color-button-disabled", css)
 
+    def test_register_template_uses_decorative_inline_svg_icons(self):
+        response = self.client.get(reverse("patients:register"))
+
+        self.assertContains(response, 'class="icon form-field__icon"', count=3)
+        self.assertContains(response, 'focusable="false"')
+        self.assertContains(response, 'aria-hidden="true"')
+
+    def test_register_styles_use_short_motion_and_reduced_motion_override(self):
+        css = Path("patients/static/patients/css/style.css").read_text()
+
+        self.assertIn("@keyframes form-card-enter", css)
+        self.assertIn("animation: form-card-enter 320ms ease-out both", css)
+        self.assertIn("transition: background 0.2s ease", css)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", css)
+        self.assertIn("transition-duration: 1ms !important", css)
+        self.assertIn("animation: none", css)
+
     def test_register_template_uses_rtl_persian_html_attributes(self):
         response = self.client.get(reverse("patients:register"))
 
@@ -177,7 +194,9 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(response, 'class="message-stack"')
         self.assertContains(response, 'message-card message-card--success')
         self.assertContains(response, 'class="message-card__icon"')
-        self.assertContains(response, "✓")
+        self.assertContains(response, 'class="icon icon--status"')
+        self.assertContains(response, 'aria-hidden="true"')
+        self.assertNotContains(response, "✓")
 
     def test_field_errors_render_below_each_field(self):
         response = self.client.post(

@@ -29,7 +29,17 @@
                     {% for message in messages %}
                         <div class="message-card{% if message.tags %} message-card--{{ message.tags }}{% endif %}" role="status">
                             <span class="message-card__icon" aria-hidden="true">
-                                {% if "error" in message.tags or "warning" in message.tags %}✕{% else %}✓{% endif %}
+                                {% if "error" in message.tags or "warning" in message.tags %}
+                                    <svg class="icon icon--status" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                                        <path d="M12 3.25 2.7 20.1h18.6L12 3.25Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                                        <path d="M12 8.4v5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                        <circle cx="12" cy="17.2" r="1" fill="currentColor"/>
+                                    </svg>
+                                {% else %}
+                                    <svg class="icon icon--status" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                                        <path d="m5 12.7 4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                {% endif %}
                             </span>
                             <p>{{ message }}</p>
                         </div>
@@ -39,7 +49,13 @@
 
             {% if form.non_field_errors %}
                 <div class="form-alert form-alert--error" role="alert" aria-label="خطاهای فرم">
-                    <span class="form-alert__icon" aria-hidden="true">!</span>
+                    <span class="form-alert__icon" aria-hidden="true">
+                        <svg class="icon icon--status" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M12 3.25 2.7 20.1h18.6L12 3.25Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                            <path d="M12 8.4v5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                            <circle cx="12" cy="17.2" r="1" fill="currentColor"/>
+                        </svg>
+                    </span>
                     <ul class="field-errors field-errors--alert">
                         {% for error in form.non_field_errors %}
                             <li>{{ error }}</li>
@@ -51,37 +67,76 @@
             <form class="registration-form" method="post" novalidate data-registration-form>
                 {% csrf_token %}
                 <div class="form-field">
-                    <label for="{{ form.first_name.id_for_label }}">نام</label>
+                    <label for="{{ form.first_name.id_for_label }}">
+                        <svg class="icon form-field__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M12 12.2a4.1 4.1 0 1 0 0-8.2 4.1 4.1 0 0 0 0 8.2Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                            <path d="M4.8 20.1a7.2 7.2 0 0 1 14.4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                        </svg>
+                        نام
+                    </label>
                     {{ form.first_name }}
                     {% if form.first_name.errors %}
                         <ul class="field-errors" aria-label="خطاهای نام">
                             {% for error in form.first_name.errors %}
-                                <li>{{ error }}</li>
+                                <li>
+                                    <svg class="icon field-errors__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                                        <path d="M12 3.25 2.7 20.1h18.6L12 3.25Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                                        <path d="M12 8.4v5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                        <circle cx="12" cy="17.2" r="1" fill="currentColor"/>
+                                    </svg>
+                                    {{ error }}
+                                </li>
                             {% endfor %}
                         </ul>
                     {% endif %}
                 </div>
 
                 <div class="form-field">
-                    <label for="{{ form.last_name.id_for_label }}">نام خانوادگی</label>
+                    <label for="{{ form.last_name.id_for_label }}">
+                        <svg class="icon form-field__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M12 12.2a4.1 4.1 0 1 0 0-8.2 4.1 4.1 0 0 0 0 8.2Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                            <path d="M4.8 20.1a7.2 7.2 0 0 1 14.4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                        </svg>
+                        نام خانوادگی
+                    </label>
                     {{ form.last_name }}
                     {% if form.last_name.errors %}
                         <ul class="field-errors" aria-label="خطاهای نام خانوادگی">
                             {% for error in form.last_name.errors %}
-                                <li>{{ error }}</li>
+                                <li>
+                                    <svg class="icon field-errors__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                                        <path d="M12 3.25 2.7 20.1h18.6L12 3.25Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                                        <path d="M12 8.4v5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                        <circle cx="12" cy="17.2" r="1" fill="currentColor"/>
+                                    </svg>
+                                    {{ error }}
+                                </li>
                             {% endfor %}
                         </ul>
                     {% endif %}
                 </div>
 
                 <div class="form-field">
-                    <label for="{{ form.mobile.id_for_label }}">شماره موبایل</label>
+                    <label for="{{ form.mobile.id_for_label }}">
+                        <svg class="icon form-field__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <rect x="7" y="2.8" width="10" height="18.4" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                            <path d="M10.4 5.7h3.2M11.2 17.9h1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                        </svg>
+                        شماره موبایل
+                    </label>
                     {{ form.mobile }}
                     <p class="form-hint" id="mobile-help">شماره موبایل باید ۱۱ رقمی و با 09 شروع شود.</p>
                     {% if form.mobile.errors %}
                         <ul class="field-errors" aria-label="خطاهای شماره موبایل">
                             {% for error in form.mobile.errors %}
-                                <li>{{ error }}</li>
+                                <li>
+                                    <svg class="icon field-errors__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                                        <path d="M12 3.25 2.7 20.1h18.6L12 3.25Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                                        <path d="M12 8.4v5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                        <circle cx="12" cy="17.2" r="1" fill="currentColor"/>
+                                    </svg>
+                                    {{ error }}
+                                </li>
                             {% endfor %}
                         </ul>
                     {% endif %}

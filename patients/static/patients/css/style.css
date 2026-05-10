@@ -42,6 +42,18 @@
     --shadow-soft: 0 16px 40px var(--color-soft-shadow);
 }
 
+@keyframes form-card-enter {
+    from {
+        opacity: 0;
+        transform: translateY(0.45rem);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 * {
     box-sizing: border-box;
 }
@@ -120,6 +132,7 @@ body {
     padding: 2rem;
     border-radius: 1.6rem;
     box-shadow: var(--shadow-card);
+    animation: form-card-enter 320ms ease-out both;
 }
 
 .form-card__header {
@@ -156,11 +169,23 @@ body {
 }
 
 .form-card label {
-    display: block;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
     color: var(--color-text);
     font-size: 1rem;
     font-weight: 700;
     line-height: 1.8;
+}
+
+.icon {
+    width: 1.15rem;
+    height: 1.15rem;
+    flex: 0 0 auto;
+}
+
+.form-field__icon {
+    color: var(--color-primary);
 }
 
 .form-card input {
@@ -288,6 +313,16 @@ body {
     line-height: 1;
 }
 
+.icon--status {
+    width: 1rem;
+    height: 1rem;
+}
+
+.field-errors__icon {
+    width: 1rem;
+    height: 1rem;
+}
+
 .message-card p {
     margin: 0;
     line-height: 1.8;
@@ -324,13 +359,6 @@ body {
     background: var(--color-error-bg);
 }
 
-.field-errors:not(.field-errors--alert) li::before {
-    content: "";
-    width: 0.4rem;
-    height: 0.4rem;
-    border-radius: 50%;
-    background: var(--color-error-text);
-}
 
 .field-errors--alert {
     margin: 0;
@@ -457,5 +485,20 @@ body {
     .help-card {
         padding: 1rem 1.1rem;
         border-radius: 1rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 1ms !important;
+    }
+
+    .form-card {
+        animation: none;
     }
 }
