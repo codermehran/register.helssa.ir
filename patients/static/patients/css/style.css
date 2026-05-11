@@ -90,6 +90,17 @@ body {
     text-align: center;
 }
 
+.hero__logo {
+    display: block;
+    width: 6rem;
+    height: 6rem;
+    margin: 0 auto 1rem;
+    object-fit: contain;
+    border-radius: 1.25rem;
+    background: var(--color-surface-icon);
+    box-shadow: var(--shadow-soft);
+}
+
 .hero__badge,
 .eyebrow {
     display: inline-flex;

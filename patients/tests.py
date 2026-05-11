@@ -6,6 +6,13 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .forms import DUPLICATE_MOBILE_ERROR, PatientRegistrationForm
+from .views import (
+    SHARE_DESCRIPTION,
+    SHARE_IMAGE_PATH,
+    SHARE_TITLE,
+    SITE_LOGO_PATH,
+    SITE_NAME,
+)
 from .models import Patient
 
 
@@ -116,11 +123,75 @@ class RegisterPatientViewTests(TestCase):
     def test_register_template_uses_persian_labels_and_submit_text(self):
         response = self.client.get(reverse("patients:register"))
 
-        self.assertContains(response, "ثبت‌نام بیماران")
+        self.assertContains(response, SITE_NAME)
         self.assertContains(response, "نام")
         self.assertContains(response, "نام خانوادگی")
         self.assertContains(response, "شماره موبایل")
         self.assertContains(response, ">ثبت‌نام</button>")
+
+    def test_register_template_includes_share_preview_metadata(self):
+        response = self.client.get(reverse("patients:register"))
+
+        share_image_url = f"http://testserver/static/{SHARE_IMAGE_PATH}"
+        self.assertContains(response, f"<title>{SHARE_TITLE}</title>")
+        self.assertContains(
+            response, f'<meta name="description" content="{SHARE_DESCRIPTION}">'
+        )
+        self.assertContains(
+            response, f'<meta property="og:site_name" content="{SITE_NAME}">'
+        )
+        self.assertContains(
+            response, f'<meta property="og:title" content="{SHARE_TITLE}">'
+        )
+        self.assertContains(
+            response,
+            f'<meta property="og:description" content="{SHARE_DESCRIPTION}">',
+        )
+        self.assertContains(
+            response, '<meta property="og:url" content="http://testserver/">'
+        )
+        self.assertContains(
+            response, f'<meta property="og:image" content="{share_image_url}">'
+        )
+        self.assertContains(
+            response, '<meta property="og:image:type" content="image/png">'
+        )
+        self.assertContains(
+            response, '<meta name="twitter:card" content="summary_large_image">'
+        )
+        self.assertContains(
+            response, f'<meta name="twitter:image" content="{share_image_url}">'
+        )
+
+    def test_logo_instructions_document_required_image_files(self):
+        instructions = Path("logo.md").read_text()
+
+        self.assertIn(SHARE_IMAGE_PATH, instructions)
+        self.assertIn(SITE_LOGO_PATH, instructions)
+        self.assertIn("1200×630", instructions)
+        self.assertIn("512×512", instructions)
+        self.assertIn(SITE_NAME, instructions)
+        self.assertIn(SHARE_DESCRIPTION, instructions)
+
+    def test_missing_site_logo_does_not_render_broken_image(self):
+        response = self.client.get(reverse("patients:register"))
+
+        self.assertNotContains(response, 'class="hero__logo"')
+        self.assertNotContains(response, '<link rel="icon" type="image/png"')
+
+    def test_site_logo_renders_after_file_is_provided(self):
+        logo_path = Path("patients/static") / SITE_LOGO_PATH
+        logo_path.parent.mkdir(parents=True, exist_ok=True)
+        logo_path.write_bytes(b"\x89PNG\r\n\x1a\n")
+        try:
+            response = self.client.get(reverse("patients:register"))
+        finally:
+            logo_path.unlink(missing_ok=True)
+
+        site_logo_url = f"http://testserver/static/{SITE_LOGO_PATH}"
+        self.assertContains(response, 'class="hero__logo"')
+        self.assertContains(response, f'src="{site_logo_url}"')
+        self.assertContains(response, f'href="{site_logo_url}"')
 
     def test_register_form_disables_submit_button_after_submit_with_javascript(self):
         response = self.client.get(reverse("patients:register"))
