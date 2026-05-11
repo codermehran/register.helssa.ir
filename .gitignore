@@ -7,7 +7,7 @@ __pycache__/
 db.sqlite3
 /media/
 /staticfiles/
-
+statics/
 # Virtual environments
 .venv/
 venv/
