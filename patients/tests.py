@@ -11,6 +11,7 @@ from .views import (
     SHARE_IMAGE_PATH,
     SHARE_TITLE,
     SITE_LOGO_PATH,
+    SITE_NAME,
 )
 from .models import Patient
 
@@ -122,7 +123,7 @@ class RegisterPatientViewTests(TestCase):
     def test_register_template_uses_persian_labels_and_submit_text(self):
         response = self.client.get(reverse("patients:register"))
 
-        self.assertContains(response, "ثبت‌نام بیماران")
+        self.assertContains(response, SITE_NAME)
         self.assertContains(response, "نام")
         self.assertContains(response, "نام خانوادگی")
         self.assertContains(response, "شماره موبایل")
@@ -135,6 +136,9 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(response, f"<title>{SHARE_TITLE}</title>")
         self.assertContains(
             response, f'<meta name="description" content="{SHARE_DESCRIPTION}">'
+        )
+        self.assertContains(
+            response, f'<meta property="og:site_name" content="{SITE_NAME}">'
         )
         self.assertContains(
             response, f'<meta property="og:title" content="{SHARE_TITLE}">'
@@ -166,6 +170,8 @@ class RegisterPatientViewTests(TestCase):
         self.assertIn(SITE_LOGO_PATH, instructions)
         self.assertIn("1200×630", instructions)
         self.assertIn("512×512", instructions)
+        self.assertIn(SITE_NAME, instructions)
+        self.assertIn(SHARE_DESCRIPTION, instructions)
 
     def test_missing_site_logo_does_not_render_broken_image(self):
         response = self.client.get(reverse("patients:register"))

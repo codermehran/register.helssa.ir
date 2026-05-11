@@ -10,7 +10,7 @@
 
     <meta property="og:locale" content="fa_IR">
     <meta property="og:type" content="website">
-    <meta property="og:site_name" content="سامانه ثبت‌نام بیماران">
+    <meta property="og:site_name" content="{{ share_meta.site_name }}">
     <meta property="og:title" content="{{ share_meta.title }}">
     <meta property="og:description" content="{{ share_meta.description }}">
     <meta property="og:url" content="{{ share_meta.url }}">
@@ -36,9 +36,9 @@
                 <img class="hero__logo" src="{{ site_logo.url }}" alt="{{ site_logo.alt }}" width="96" height="96">
             {% endif %}
             <div class="hero__badge">سامانه امن پذیرش</div>
-            <h1 id="page-title">سامانه ثبت‌نام بیماران</h1>
+            <h1 id="page-title">{{ share_meta.site_name }}</h1>
             <p>
-                اطلاعات شما فقط برای ثبت‌نام و تماس با شما استفاده می‌شود.
+                {{ share_meta.description }}
             </p>
         </section>
 

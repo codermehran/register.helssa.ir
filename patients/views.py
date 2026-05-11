@@ -7,10 +7,11 @@ from django.templatetags.static import static
 from .forms import DUPLICATE_MOBILE_ERROR, PatientRegistrationForm
 
 SAVE_ERROR = "در ذخیره‌سازی اطلاعات مشکلی رخ داد. لطفاً دوباره تلاش کنید."
-SHARE_TITLE = "ثبت‌نام بیماران | سامانه امن پذیرش"
+SITE_NAME = "سامانه ثبت نام پزشک خانواده دکتر حسین شبانی"
+SHARE_TITLE = SITE_NAME
 SHARE_DESCRIPTION = (
-    "ثبت‌نام اولیه بیماران در سامانه امن پذیرش؛ اطلاعات شما فقط برای ثبت‌نام "
-    "و تماس بعدی استفاده می‌شود."
+    "سامانه ثبت نام پزشک خانواده دکتر حسین شبانی؛ برای تکمیل ثبت‌نام "
+    "اولیه و ثبت اطلاعات تماس بیماران."
 )
 SHARE_IMAGE_PATH = "patients/images/share-logo.png"
 SITE_LOGO_PATH = "patients/images/site-logo.png"
@@ -52,6 +53,7 @@ def register_patient(request):
         form = PatientRegistrationForm()
 
     share_meta = {
+        "site_name": SITE_NAME,
         "title": SHARE_TITLE,
         "description": SHARE_DESCRIPTION,
         "url": request.build_absolute_uri(request.path),
@@ -63,7 +65,7 @@ def register_patient(request):
     if _static_source_exists(SITE_LOGO_PATH):
         site_logo = {
             "url": _absolute_static_url(request, SITE_LOGO_PATH),
-            "alt": "لوگوی سامانه ثبت‌نام بیماران",
+            "alt": f"لوگوی {SITE_NAME}",
         }
 
     return render(
