@@ -11,6 +11,8 @@ statics/
 # Virtual environments
 .venv/
 venv/
+.vscode/
+
 
 # Environment variables
 .env
