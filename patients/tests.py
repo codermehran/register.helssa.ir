@@ -1,8 +1,8 @@
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.db import DatabaseError, IntegrityError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .forms import DUPLICATE_MOBILE_ERROR, PatientRegistrationForm
@@ -14,6 +14,7 @@ from .views import (
     SITE_NAME,
 )
 from .models import Patient
+from .sms import KavenegarSMSConfigurationError, send_register_sms
 
 
 class PatientModelTests(TestCase):
@@ -111,6 +112,55 @@ class PatientRegistrationFormTests(TestCase):
         )
 
 
+class KavenegarRegisterSMSTests(TestCase):
+    @override_settings(
+        KAVENEGAR_API_KEY="test-api-key",
+        KAVENEGAR_REGISTER_TEMPLATE="register",
+    )
+    def test_send_register_sms_uses_mobile_as_register_template_token(self):
+        api = Mock()
+        api.verify_lookup.return_value = {"return": {"status": 200}}
+
+        with patch("patients.sms._build_kavenegar_api", return_value=api) as build_api:
+            result = send_register_sms("09123456789")
+
+        self.assertEqual(result, {"return": {"status": 200}})
+        build_api.assert_called_once_with("test-api-key")
+        api.verify_lookup.assert_called_once_with(
+            {"receptor": "09123456789", "template": "register", "token": "09123456789"}
+        )
+
+    @override_settings(KAVENEGAR_API_KEY="")
+    def test_send_register_sms_requires_api_key(self):
+        with self.assertRaises(KavenegarSMSConfigurationError):
+            send_register_sms("09123456789")
+
+    @override_settings(KAVENEGAR_API_KEY="test-api-key")
+    def test_patient_creation_signal_sends_register_sms_after_commit(self):
+        with patch("patients.signals.send_register_sms") as send_sms:
+            with self.captureOnCommitCallbacks(execute=True):
+                Patient.objects.create(
+                    first_name="Ali",
+                    last_name="Ahmadi",
+                    mobile="09123456789",
+                )
+
+        send_sms.assert_called_once_with("09123456789")
+
+    @override_settings(KAVENEGAR_API_KEY="test-api-key")
+    def test_patient_update_signal_does_not_send_register_sms(self):
+        patient = Patient.objects.create(
+            first_name="Ali", last_name="Ahmadi", mobile="09123456789"
+        )
+
+        with patch("patients.signals.send_register_sms") as send_sms:
+            with self.captureOnCommitCallbacks(execute=True):
+                patient.first_name = "Reza"
+                patient.save()
+
+        send_sms.assert_not_called()
+
+
 class RegisterPatientViewTests(TestCase):
     def test_get_register_patient_displays_empty_form(self):
         response = self.client.get(reverse("patients:register"))
@@ -174,7 +224,13 @@ class RegisterPatientViewTests(TestCase):
         self.assertIn(SHARE_DESCRIPTION, instructions)
 
     def test_missing_site_logo_does_not_render_broken_image(self):
-        response = self.client.get(reverse("patients:register"))
+        logo_path = Path("patients/static") / SITE_LOGO_PATH
+        hidden_logo_path = logo_path.with_suffix(".hidden-for-test")
+        logo_path.rename(hidden_logo_path)
+        try:
+            response = self.client.get(reverse("patients:register"))
+        finally:
+            hidden_logo_path.rename(logo_path)
 
         self.assertNotContains(response, 'class="hero__logo"')
         self.assertNotContains(response, '<link rel="icon" type="image/png"')
@@ -182,11 +238,16 @@ class RegisterPatientViewTests(TestCase):
     def test_site_logo_renders_after_file_is_provided(self):
         logo_path = Path("patients/static") / SITE_LOGO_PATH
         logo_path.parent.mkdir(parents=True, exist_ok=True)
+        logo_existed = logo_path.exists()
+        original_logo = logo_path.read_bytes() if logo_existed else None
         logo_path.write_bytes(b"\x89PNG\r\n\x1a\n")
         try:
             response = self.client.get(reverse("patients:register"))
         finally:
-            logo_path.unlink(missing_ok=True)
+            if logo_existed:
+                logo_path.write_bytes(original_logo)
+            else:
+                logo_path.unlink(missing_ok=True)
 
         site_logo_url = f"http://testserver/static/{SITE_LOGO_PATH}"
         self.assertContains(response, 'class="hero__logo"')

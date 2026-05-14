@@ -10,22 +10,65 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def _load_env_file(path):
+    """Load simple KEY=VALUE pairs from .env without overriding real env vars."""
+
+    if not path.exists():
+        return
+
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key:
+            os.environ.setdefault(key, value)
+
+
+def _env(name, default=""):
+    return os.environ.get(name, default)
+
+
+def _env_bool(name, default=False):
+    value = _env(name, str(default)).strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
+def _env_list(name, default=None):
+    value = _env(name, "")
+    if not value:
+        return default or []
+
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+_load_env_file(BASE_DIR / ".env")
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-+r+8pinaupck+0()ptkxuak8km)6giww(ni+ot7u68h4yk4r6w"
+SECRET_KEY = _env(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-+r+8pinaupck+0()ptkxuak8km)6giww(ni+ot7u68h4yk4r6w",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = _env_bool("DJANGO_DEBUG", True)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = _env_list("DJANGO_ALLOWED_HOSTS")
+CSRF_TRUSTED_ORIGINS = _env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 
 
 # Application definition
@@ -37,7 +80,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "patients",
+    "patients.apps.PatientsConfig",
 ]
 
 MIDDLEWARE = [
@@ -73,12 +116,32 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+DB_ENGINE = _env("DB_ENGINE", "sqlite").strip().lower()
+USE_MYSQL = DB_ENGINE in {"mysql", "django.db.backends.mysql"}
+
+if USE_MYSQL:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": _env("MYSQL_DATABASE", _env("DB_NAME", "register_helssa")),
+            "USER": _env("MYSQL_USER", _env("DB_USER", "root")),
+            "PASSWORD": _env("MYSQL_PASSWORD", _env("DB_PASSWORD", "")),
+            "HOST": _env("MYSQL_HOST", _env("DB_HOST", "127.0.0.1")),
+            "PORT": _env("MYSQL_PORT", _env("DB_PORT", "3306")),
+            "OPTIONS": {"charset": _env("MYSQL_CHARSET", "utf8mb4")},
+        }
     }
-}
+else:
+    SQLITE_NAME = Path(_env("SQLITE_NAME", str(BASE_DIR / "db.sqlite3")))
+    if not SQLITE_NAME.is_absolute():
+        SQLITE_NAME = BASE_DIR / SQLITE_NAME
+
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": SQLITE_NAME,
+        }
+    }
 
 
 # Password validation
@@ -103,9 +166,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = _env("DJANGO_LANGUAGE_CODE", "en-us")
 
-TIME_ZONE = "UTC"
+TIME_ZONE = _env("DJANGO_TIME_ZONE", "UTC")
 
 USE_I18N = True
 
@@ -115,8 +178,12 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = "static/"
-STATIC_ROOT= BASE_DIR / "statics"
+STATIC_URL = _env("DJANGO_STATIC_URL", "static/")
+STATIC_ROOT = BASE_DIR / _env("DJANGO_STATIC_ROOT", "statics")
+
+# Kavenegar SMS settings
+KAVENEGAR_API_KEY = _env("KAVENEGAR_API_KEY")
+KAVENEGAR_REGISTER_TEMPLATE = _env("KAVENEGAR_REGISTER_TEMPLATE", "register")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
