@@ -33,16 +33,16 @@
     <main class="registration-page">
         <section class="hero" aria-labelledby="page-title">
             {% if site_logo %}
-                <img class="hero__logo" src="{{ site_logo.url }}" alt="{{ site_logo.alt }}" width="96" height="96">
+                <img class="hero__logo reveal" src="{{ site_logo.url }}" alt="{{ site_logo.alt }}" width="96" height="96">
             {% endif %}
-            <div class="hero__badge">سامانه ثبت نام پزشک خانواده</div>
-            <h1 id="page-title">{{ share_meta.site_name }}</h1>
-            <p>
+            <div class="hero__badge reveal reveal--delay-1">سامانه ثبت نام پزشک خانواده</div>
+            <h1 id="page-title" class="reveal reveal--delay-2">{{ share_meta.site_name }}</h1>
+            <p class="reveal reveal--delay-3">
                 {{ share_meta.description }}
             </p>
         </section>
 
-        <section class="form-card" aria-labelledby="form-title">
+        <section class="form-card reveal reveal--delay-4" aria-labelledby="form-title">
             <div class="form-card__header">
                 <p class="eyebrow">فرم ثبت اطلاعات</p>
                 <h2 id="form-title">ثبت‌نام اولیه بیمار</h2>
@@ -91,7 +91,7 @@
 
             <form class="registration-form" method="post" novalidate data-registration-form>
                 {% csrf_token %}
-                <div class="form-field">
+                <div class="form-field reveal reveal--delay-5">
                     <label for="{{ form.first_name.id_for_label }}">
                         <svg class="icon form-field__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
                             <path d="M12 12.2a4.1 4.1 0 1 0 0-8.2 4.1 4.1 0 0 0 0 8.2Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
@@ -116,7 +116,7 @@
                     {% endif %}
                 </div>
 
-                <div class="form-field">
+                <div class="form-field reveal reveal--delay-6">
                     <label for="{{ form.last_name.id_for_label }}">
                         <svg class="icon form-field__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
                             <path d="M12 12.2a4.1 4.1 0 1 0 0-8.2 4.1 4.1 0 0 0 0 8.2Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
@@ -141,7 +141,7 @@
                     {% endif %}
                 </div>
 
-                <div class="form-field">
+                <div class="form-field reveal reveal--delay-7">
                     <label for="{{ form.mobile.id_for_label }}">
                         <svg class="icon form-field__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
                             <rect x="7" y="2.8" width="10" height="18.4" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/>
@@ -171,7 +171,7 @@
             </form>
         </section>
 
-        <aside class="help-card" aria-label="راهنمای ثبت‌نام">
+        <aside class="help-card reveal reveal--delay-8" aria-label="راهنمای ثبت‌نام">
             <h2>راهنمای کوتاه</h2>
             <ul>
                 <li>شماره موبایل را ۱۱ رقمی و با 09 وارد کنید.</li>
