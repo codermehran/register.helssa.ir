@@ -250,7 +250,7 @@ class RegisterPatientViewTests(TestCase):
                 logo_path.unlink(missing_ok=True)
 
         site_logo_url = f"http://testserver/static/{SITE_LOGO_PATH}"
-        self.assertContains(response, 'class="hero__logo"')
+        self.assertContains(response, 'class="hero__logo reveal"')
         self.assertContains(response, f'src="{site_logo_url}"')
         self.assertContains(response, f'href="{site_logo_url}"')
 
