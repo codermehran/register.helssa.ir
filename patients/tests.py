@@ -5,7 +5,11 @@ from django.db import DatabaseError, IntegrityError
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from .forms import DUPLICATE_MOBILE_ERROR, PatientRegistrationForm
+from .forms import (
+    DUPLICATE_MOBILE_ERROR,
+    DUPLICATE_NATIONAL_CODE_ERROR,
+    PatientRegistrationForm,
+)
 from .views import (
     SHARE_DESCRIPTION,
     SHARE_IMAGE_PATH,
@@ -28,17 +32,65 @@ class PatientRegistrationFormTests(TestCase):
             data={
                 "first_name": "Ali",
                 "last_name": "Ahmadi",
+                "national_code": "1234567890",
                 "mobile": "09123456789",
             }
         )
 
         self.assertTrue(form.is_valid())
 
+
+    def test_national_code_must_be_exactly_ten_digits(self):
+        form = PatientRegistrationForm(
+            data={
+                "first_name": "Ali",
+                "last_name": "Ahmadi",
+                "national_code": "123456789",
+                "mobile": "09123456789",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertEqual(form.errors["national_code"], ["کد ملی را ۱۰ رقمی وارد کنید."])
+
+    def test_national_code_must_contain_only_digits(self):
+        form = PatientRegistrationForm(
+            data={
+                "first_name": "Ali",
+                "last_name": "Ahmadi",
+                "national_code": "123456789a",
+                "mobile": "09123456789",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertEqual(form.errors["national_code"], ["کد ملی باید فقط شامل عدد باشد."])
+
+    def test_national_code_must_be_unique(self):
+        Patient.objects.create(
+            first_name="Existing",
+            last_name="Patient",
+            national_code="1234567890",
+            mobile="09111111111",
+        )
+        form = PatientRegistrationForm(
+            data={
+                "first_name": "Ali",
+                "last_name": "Ahmadi",
+                "national_code": "1234567890",
+                "mobile": "09123456789",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertEqual(form.errors["national_code"], [DUPLICATE_NATIONAL_CODE_ERROR])
+
     def test_mobile_must_be_exactly_eleven_digits(self):
         form = PatientRegistrationForm(
             data={
                 "first_name": "Ali",
                 "last_name": "Ahmadi",
+                "national_code": "1234567890",
                 "mobile": "0912345678",
             }
         )
@@ -54,6 +106,7 @@ class PatientRegistrationFormTests(TestCase):
             data={
                 "first_name": "Ali",
                 "last_name": "Ahmadi",
+                "national_code": "1234567890",
                 "mobile": "0912345678a",
             }
         )
@@ -69,6 +122,7 @@ class PatientRegistrationFormTests(TestCase):
             data={
                 "first_name": "Ali",
                 "last_name": "Ahmadi",
+                "national_code": "1234567890",
                 "mobile": "08123456789",
             }
         )
@@ -84,11 +138,13 @@ class PatientRegistrationFormTests(TestCase):
             first_name="Existing",
             last_name="Patient",
             mobile="09123456789",
+            national_code="1111111111",
         )
         form = PatientRegistrationForm(
             data={
                 "first_name": "Ali",
                 "last_name": "Ahmadi",
+                "national_code": "1234567890",
                 "mobile": "09123456789",
             }
         )
@@ -107,6 +163,7 @@ class PatientRegistrationFormTests(TestCase):
         self.assertEqual(
             form.errors["last_name"], ["نام خانوادگی را وارد کنید."]
         )
+        self.assertEqual(form.errors["national_code"], ["کد ملی را وارد کنید."])
         self.assertEqual(
             form.errors["mobile"], ["شماره موبایل را وارد کنید."]
         )
@@ -150,7 +207,7 @@ class KavenegarRegisterSMSTests(TestCase):
     @override_settings(KAVENEGAR_API_KEY="test-api-key")
     def test_patient_update_signal_does_not_send_register_sms(self):
         patient = Patient.objects.create(
-            first_name="Ali", last_name="Ahmadi", mobile="09123456789"
+            first_name="Ali", last_name="Ahmadi", mobile="09123456789", national_code="1111111111"
         )
 
         with patch("patients.signals.send_register_sms") as send_sms:
@@ -272,7 +329,7 @@ class RegisterPatientViewTests(TestCase):
     def test_register_template_uses_decorative_inline_svg_icons(self):
         response = self.client.get(reverse("patients:register"))
 
-        self.assertContains(response, 'class="icon form-field__icon"', count=3)
+        self.assertContains(response, 'class="icon form-field__icon"', count=4)
         self.assertContains(response, 'focusable="false"')
         self.assertContains(response, 'aria-hidden="true"')
 
@@ -298,6 +355,10 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(response, 'placeholder="مثلاً علی"')
         self.assertContains(response, 'autocomplete="family-name"')
         self.assertContains(response, 'placeholder="مثلاً رضایی"')
+        self.assertContains(response, 'autocomplete="off"')
+        self.assertContains(response, 'aria-describedby="national-code-help"')
+        self.assertContains(response, 'maxlength="10"')
+        self.assertContains(response, 'placeholder="1234567890"')
         self.assertContains(response, 'autocomplete="tel"')
         self.assertContains(response, 'aria-describedby="mobile-help"')
         self.assertContains(response, 'dir="ltr"')
@@ -318,6 +379,7 @@ class RegisterPatientViewTests(TestCase):
             data={
                 "first_name": "Ali",
                 "last_name": "Ahmadi",
+                "national_code": "1234567890",
                 "mobile": "09123456789",
             },
             follow=True,
@@ -333,7 +395,7 @@ class RegisterPatientViewTests(TestCase):
     def test_field_errors_render_below_each_field(self):
         response = self.client.post(
             reverse("patients:register"),
-            data={"first_name": "", "last_name": "", "mobile": "08123456789"},
+            data={"first_name": "", "last_name": "", "national_code": "", "mobile": "08123456789"},
         )
 
         self.assertContains(response, 'aria-label="خطاهای نام"')
@@ -349,6 +411,7 @@ class RegisterPatientViewTests(TestCase):
             data={
                 "first_name": "علی",
                 "last_name": "احمدی",
+                "national_code": "1234567890",
                 "mobile": "08123456789",
             },
         )
@@ -363,6 +426,7 @@ class RegisterPatientViewTests(TestCase):
             data={
                 "first_name": "Ali",
                 "last_name": "Ahmadi",
+                "national_code": "1234567890",
                 "mobile": "09123456789",
             },
         )
@@ -386,6 +450,7 @@ class RegisterPatientViewTests(TestCase):
             data={
                 "first_name": "Ali",
                 "last_name": "Ahmadi",
+                "national_code": "1234567890",
                 "mobile": "08123456789",
             },
         )
@@ -408,7 +473,8 @@ class RegisterPatientViewTests(TestCase):
                 data={
                     "first_name": "Ali",
                     "last_name": "Ahmadi",
-                    "mobile": "09123456789",
+                    "national_code": "1234567890",
+                "mobile": "09123456789",
                 },
             )
 
@@ -430,7 +496,8 @@ class RegisterPatientViewTests(TestCase):
                 data={
                     "first_name": "Ali",
                     "last_name": "Ahmadi",
-                    "mobile": "09123456789",
+                    "national_code": "1234567890",
+                "mobile": "09123456789",
                 },
             )
 

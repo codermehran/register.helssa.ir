@@ -4,7 +4,11 @@ from django.db import DatabaseError, IntegrityError, transaction
 from django.shortcuts import redirect, render
 from django.templatetags.static import static
 
-from .forms import DUPLICATE_MOBILE_ERROR, PatientRegistrationForm
+from .forms import (
+    DUPLICATE_MOBILE_ERROR,
+    DUPLICATE_NATIONAL_CODE_ERROR,
+    PatientRegistrationForm,
+)
 
 SAVE_ERROR = "در ذخیره‌سازی اطلاعات مشکلی رخ داد. لطفاً دوباره تلاش کنید."
 SITE_NAME = "سامانه ثبت نام پزشک خانواده دکتر حسین شبانی"
@@ -44,6 +48,7 @@ def register_patient(request):
                     form.save()
             except IntegrityError:
                 form.add_error("mobile", DUPLICATE_MOBILE_ERROR)
+                form.add_error("national_code", DUPLICATE_NATIONAL_CODE_ERROR)
             except DatabaseError:
                 form.add_error(None, SAVE_ERROR)
             else:

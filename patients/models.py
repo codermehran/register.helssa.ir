@@ -5,6 +5,7 @@ class Patient(models.Model):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     mobile = models.CharField(max_length=11, unique=True)
+    national_code = models.CharField(max_length=10, unique=True, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
