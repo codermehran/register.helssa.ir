@@ -142,6 +142,32 @@
                 </div>
 
                 <div class="form-field reveal reveal--delay-7">
+                    <label for="{{ form.national_code.id_for_label }}">
+                        <svg class="icon form-field__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <rect x="4" y="4.5" width="16" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                            <path d="M8 9.5h8M8 14h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                        </svg>
+                        کد ملی
+                    </label>
+                    {{ form.national_code }}
+                    <p class="form-hint" id="national-code-help">کد ملی باید ۱۰ رقمی باشد.</p>
+                    {% if form.national_code.errors %}
+                        <ul class="field-errors" aria-label="خطاهای کد ملی">
+                            {% for error in form.national_code.errors %}
+                                <li>
+                                    <svg class="icon field-errors__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                                        <path d="M12 3.25 2.7 20.1h18.6L12 3.25Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                                        <path d="M12 8.4v5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                        <circle cx="12" cy="17.2" r="1" fill="currentColor"/>
+                                    </svg>
+                                    {{ error }}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+
+                <div class="form-field reveal reveal--delay-8">
                     <label for="{{ form.mobile.id_for_label }}">
                         <svg class="icon form-field__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
                             <rect x="7" y="2.8" width="10" height="18.4" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/>
@@ -171,10 +197,10 @@
             </form>
         </section>
 
-        <aside class="help-card reveal reveal--delay-8" aria-label="راهنمای ثبت‌نام">
+        <aside class="help-card reveal reveal--delay-9" aria-label="راهنمای ثبت‌نام">
             <h2>راهنمای کوتاه</h2>
             <ul>
-                <li>شماره موبایل را ۱۱ رقمی و با 09 وارد کنید.</li>
+                <li>کد ملی را ۱۰ رقمی و شماره موبایل را ۱۱ رقمی وارد کنید.</li>
                 <li>پس از ثبت، پیام تأیید را همین‌جا می‌بینید.</li>
                 <li>اگر خطایی دیدید، همان بخش را اصلاح کنید.</li>
             </ul>

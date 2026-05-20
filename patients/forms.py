@@ -4,6 +4,7 @@ from .models import Patient
 
 
 DUPLICATE_MOBILE_ERROR = "این شماره قبلاً ثبت شده است."
+DUPLICATE_NATIONAL_CODE_ERROR = "این کد ملی قبلاً ثبت شده است."
 
 
 class PatientRegistrationForm(forms.ModelForm):
@@ -23,6 +24,22 @@ class PatientRegistrationForm(forms.ModelForm):
         ),
         error_messages={"required": "نام خانوادگی را وارد کنید."},
     )
+    national_code = forms.CharField(
+        label="کد ملی",
+        required=True,
+        widget=forms.TextInput(
+            attrs={
+                "autocomplete": "off",
+                "aria-describedby": "national-code-help",
+                "dir": "ltr",
+                "inputmode": "numeric",
+                "maxlength": "10",
+                "placeholder": "1234567890",
+            }
+        ),
+        error_messages={"required": "کد ملی را وارد کنید."},
+    )
+
     mobile = forms.CharField(
         label="شماره موبایل",
         required=True,
@@ -41,7 +58,7 @@ class PatientRegistrationForm(forms.ModelForm):
 
     class Meta:
         model = Patient
-        fields = ["first_name", "last_name", "mobile"]
+        fields = ["first_name", "last_name", "national_code", "mobile"]
 
     def clean_mobile(self):
         mobile = self.cleaned_data["mobile"]
@@ -59,3 +76,17 @@ class PatientRegistrationForm(forms.ModelForm):
             raise forms.ValidationError(DUPLICATE_MOBILE_ERROR)
 
         return mobile
+
+    def clean_national_code(self):
+        national_code = self.cleaned_data["national_code"]
+
+        if len(national_code) != 10:
+            raise forms.ValidationError("کد ملی را ۱۰ رقمی وارد کنید.")
+
+        if not national_code.isdigit():
+            raise forms.ValidationError("کد ملی باید فقط شامل عدد باشد.")
+
+        if Patient.objects.filter(national_code=national_code).exists():
+            raise forms.ValidationError(DUPLICATE_NATIONAL_CODE_ERROR)
+
+        return national_code
