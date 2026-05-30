@@ -3,7 +3,7 @@ import logging
 from django.contrib import admin, messages
 
 from .models import Patient
-from .sms import build_patient_sms_token, send_done_sms
+from .sms import build_patient_name_token, send_done_sms
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class PatientAdmin(admin.ModelAdmin):
 
         for patient in queryset:
             try:
-                send_done_sms(patient.mobile, build_patient_sms_token(patient))
+                send_done_sms(patient.mobile, build_patient_name_token(patient))
                 sent_count += 1
             except Exception:
                 failed_count += 1

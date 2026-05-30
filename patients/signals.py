@@ -5,7 +5,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from .models import Patient
-from .sms import build_patient_sms_token, send_register_sms
+from .sms import build_patient_name_token, send_register_sms
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ def send_register_sms_after_patient_created(sender, instance, created, **kwargs)
 
     def _send_sms():
         try:
-            send_register_sms(instance.mobile, build_patient_sms_token(instance))
+            send_register_sms(instance.mobile, build_patient_name_token(instance))
         except Exception:
             logger.exception(
                 "Failed to send Kavenegar register SMS to patient %s.", instance.pk
