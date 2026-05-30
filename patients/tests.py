@@ -2,6 +2,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from django.db import DatabaseError, IntegrityError
+from django.contrib.auth import get_user_model
+from django.contrib.messages import get_messages
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -18,7 +20,7 @@ from .views import (
     SITE_NAME,
 )
 from .models import Patient
-from .sms import KavenegarSMSConfigurationError, send_register_sms
+from .sms import KavenegarSMSConfigurationError, send_done_sms, send_register_sms
 
 
 class PatientModelTests(TestCase):
@@ -38,7 +40,6 @@ class PatientRegistrationFormTests(TestCase):
         )
 
         self.assertTrue(form.is_valid())
-
 
     def test_national_code_must_be_exactly_ten_digits(self):
         form = PatientRegistrationForm(
@@ -64,7 +65,9 @@ class PatientRegistrationFormTests(TestCase):
         )
 
         self.assertFalse(form.is_valid())
-        self.assertEqual(form.errors["national_code"], ["کد ملی باید فقط شامل عدد باشد."])
+        self.assertEqual(
+            form.errors["national_code"], ["کد ملی باید فقط شامل عدد باشد."]
+        )
 
     def test_national_code_must_be_unique(self):
         Patient.objects.create(
@@ -160,13 +163,9 @@ class PatientRegistrationFormTests(TestCase):
 
         self.assertFalse(form.is_valid())
         self.assertEqual(form.errors["first_name"], ["نام را وارد کنید."])
-        self.assertEqual(
-            form.errors["last_name"], ["نام خانوادگی را وارد کنید."]
-        )
+        self.assertEqual(form.errors["last_name"], ["نام خانوادگی را وارد کنید."])
         self.assertEqual(form.errors["national_code"], ["کد ملی را وارد کنید."])
-        self.assertEqual(
-            form.errors["mobile"], ["شماره موبایل را وارد کنید."]
-        )
+        self.assertEqual(form.errors["mobile"], ["شماره موبایل را وارد کنید."])
 
 
 class KavenegarRegisterSMSTests(TestCase):
@@ -174,17 +173,38 @@ class KavenegarRegisterSMSTests(TestCase):
         KAVENEGAR_API_KEY="test-api-key",
         KAVENEGAR_REGISTER_TEMPLATE="register",
     )
-    def test_send_register_sms_uses_mobile_as_register_template_token(self):
+    def test_send_register_sms_uses_name_as_register_template_token(self):
         api = Mock()
         api.verify_lookup.return_value = {"return": {"status": 200}}
 
         with patch("patients.sms._build_kavenegar_api", return_value=api) as build_api:
-            result = send_register_sms("09123456789")
+            result = send_register_sms("09123456789", "Ali_Ahmadi")
 
         self.assertEqual(result, {"return": {"status": 200}})
         build_api.assert_called_once_with("test-api-key")
         api.verify_lookup.assert_called_once_with(
-            {"receptor": "09123456789", "template": "register", "token": "09123456789"}
+            {"receptor": "09123456789", "template": "register", "token": "Ali_Ahmadi"}
+        )
+
+    @override_settings(
+        KAVENEGAR_API_KEY="test-api-key",
+        KAVENEGAR_DONE_TEMPLATE="done-template",
+    )
+    def test_send_done_sms_uses_configured_done_template(self):
+        api = Mock()
+        api.verify_lookup.return_value = {"return": {"status": 200}}
+
+        with patch("patients.sms._build_kavenegar_api", return_value=api) as build_api:
+            result = send_done_sms("09123456789", "Ali_Ahmadi")
+
+        self.assertEqual(result, {"return": {"status": 200}})
+        build_api.assert_called_once_with("test-api-key")
+        api.verify_lookup.assert_called_once_with(
+            {
+                "receptor": "09123456789",
+                "template": "done-template",
+                "token": "Ali_Ahmadi",
+            }
         )
 
     @override_settings(KAVENEGAR_API_KEY="")
@@ -202,12 +222,48 @@ class KavenegarRegisterSMSTests(TestCase):
                     mobile="09123456789",
                 )
 
-        send_sms.assert_called_once_with("09123456789")
+        send_sms.assert_called_once_with("09123456789", "Ali_Ahmadi")
+
+    @override_settings(KAVENEGAR_API_KEY="test-api-key")
+    def test_admin_action_sends_done_sms_to_selected_patients(self):
+        user = get_user_model().objects.create_superuser(
+            username="admin",
+            email="admin@example.com",
+            password="password",
+        )
+        self.client.force_login(user)
+        patient = Patient.objects.create(
+            first_name="Ali",
+            last_name="Ahmadi",
+            mobile="09123456789",
+            national_code="1111111111",
+        )
+
+        with patch("patients.admin.send_done_sms") as send_sms:
+            response = self.client.post(
+                reverse("admin:patients_patient_changelist"),
+                {
+                    "action": "send_done_sms_to_patients",
+                    "_selected_action": [str(patient.pk)],
+                    "index": "0",
+                },
+                follow=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        send_sms.assert_called_once_with("09123456789", "Ali_Ahmadi")
+        self.assertIn(
+            "پیامک انجام شد برای 1 بیمار ارسال شد.",
+            [message.message for message in get_messages(response.wsgi_request)],
+        )
 
     @override_settings(KAVENEGAR_API_KEY="test-api-key")
     def test_patient_update_signal_does_not_send_register_sms(self):
         patient = Patient.objects.create(
-            first_name="Ali", last_name="Ahmadi", mobile="09123456789", national_code="1111111111"
+            first_name="Ali",
+            last_name="Ahmadi",
+            mobile="09123456789",
+            national_code="1111111111",
         )
 
         with patch("patients.signals.send_register_sms") as send_sms:
@@ -314,10 +370,10 @@ class RegisterPatientViewTests(TestCase):
     def test_register_form_disables_submit_button_after_submit_with_javascript(self):
         response = self.client.get(reverse("patients:register"))
 
-        self.assertContains(response, 'data-registration-form')
-        self.assertContains(response, 'data-submit-button')
+        self.assertContains(response, "data-registration-form")
+        self.assertContains(response, "data-submit-button")
         self.assertContains(response, 'data-submitting-text="در حال ثبت..."')
-        self.assertContains(response, 'submitButton.disabled = true')
+        self.assertContains(response, "submitButton.disabled = true")
 
     def test_register_button_has_disabled_styles(self):
         css = Path("patients/static/patients/css/style.css").read_text()
@@ -365,9 +421,7 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(response, 'inputmode="numeric"')
         self.assertContains(response, 'maxlength="11"')
         self.assertContains(response, 'placeholder="09123456789"')
-        self.assertContains(
-            response, "شماره موبایل باید ۱۱ رقمی و با 09 شروع شود."
-        )
+        self.assertContains(response, "شماره موبایل باید ۱۱ رقمی و با 09 شروع شود.")
 
     def test_register_template_styles_messages_as_alert_cards(self):
         response = self.client.get(reverse("patients:register"))
@@ -386,7 +440,7 @@ class RegisterPatientViewTests(TestCase):
         )
 
         self.assertContains(response, 'class="message-stack"')
-        self.assertContains(response, 'message-card message-card--success')
+        self.assertContains(response, "message-card message-card--success")
         self.assertContains(response, 'class="message-card__icon"')
         self.assertContains(response, 'class="icon icon--status"')
         self.assertContains(response, 'aria-hidden="true"')
@@ -395,7 +449,12 @@ class RegisterPatientViewTests(TestCase):
     def test_field_errors_render_below_each_field(self):
         response = self.client.post(
             reverse("patients:register"),
-            data={"first_name": "", "last_name": "", "national_code": "", "mobile": "08123456789"},
+            data={
+                "first_name": "",
+                "last_name": "",
+                "national_code": "",
+                "mobile": "08123456789",
+            },
         )
 
         self.assertContains(response, 'aria-label="خطاهای نام"')
@@ -474,7 +533,7 @@ class RegisterPatientViewTests(TestCase):
                     "first_name": "Ali",
                     "last_name": "Ahmadi",
                     "national_code": "1234567890",
-                "mobile": "09123456789",
+                    "mobile": "09123456789",
                 },
             )
 
@@ -497,7 +556,7 @@ class RegisterPatientViewTests(TestCase):
                     "first_name": "Ali",
                     "last_name": "Ahmadi",
                     "national_code": "1234567890",
-                "mobile": "09123456789",
+                    "mobile": "09123456789",
                 },
             )
 
