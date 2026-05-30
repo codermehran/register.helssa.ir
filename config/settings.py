@@ -184,6 +184,7 @@ STATIC_ROOT = BASE_DIR / _env("DJANGO_STATIC_ROOT", "statics")
 # Kavenegar SMS settings
 KAVENEGAR_API_KEY = _env("KAVENEGAR_API_KEY")
 KAVENEGAR_REGISTER_TEMPLATE = _env("KAVENEGAR_REGISTER_TEMPLATE", "register")
+KAVENEGAR_DONE_TEMPLATE = _env("KAVENEGAR_DONE_TEMPLATE", "done")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

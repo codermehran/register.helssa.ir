@@ -1,6 +1,8 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from django.contrib.auth import get_user_model
+from django.contrib.messages import get_messages
 from django.db import DatabaseError, IntegrityError
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -18,7 +20,7 @@ from .views import (
     SITE_NAME,
 )
 from .models import Patient
-from .sms import KavenegarSMSConfigurationError, send_register_sms
+from .sms import KavenegarSMSConfigurationError, send_done_sms, send_register_sms
 
 
 class PatientModelTests(TestCase):
@@ -174,23 +176,44 @@ class KavenegarRegisterSMSTests(TestCase):
         KAVENEGAR_API_KEY="test-api-key",
         KAVENEGAR_REGISTER_TEMPLATE="register",
     )
-    def test_send_register_sms_uses_mobile_as_register_template_token(self):
+    def test_send_register_sms_uses_name_as_register_template_token(self):
         api = Mock()
         api.verify_lookup.return_value = {"return": {"status": 200}}
 
         with patch("patients.sms._build_kavenegar_api", return_value=api) as build_api:
-            result = send_register_sms("09123456789")
+            result = send_register_sms("09123456789", "Ali_Ahmadi")
 
         self.assertEqual(result, {"return": {"status": 200}})
         build_api.assert_called_once_with("test-api-key")
         api.verify_lookup.assert_called_once_with(
-            {"receptor": "09123456789", "template": "register", "token": "09123456789"}
+            {"receptor": "09123456789", "template": "register", "token": "Ali_Ahmadi"}
+        )
+
+    @override_settings(
+        KAVENEGAR_API_KEY="test-api-key",
+        KAVENEGAR_DONE_TEMPLATE="done-template",
+    )
+    def test_send_done_sms_uses_configured_done_template(self):
+        api = Mock()
+        api.verify_lookup.return_value = {"return": {"status": 200}}
+
+        with patch("patients.sms._build_kavenegar_api", return_value=api) as build_api:
+            result = send_done_sms("09123456789", "Ali_Ahmadi")
+
+        self.assertEqual(result, {"return": {"status": 200}})
+        build_api.assert_called_once_with("test-api-key")
+        api.verify_lookup.assert_called_once_with(
+            {
+                "receptor": "09123456789",
+                "template": "done-template",
+                "token": "Ali_Ahmadi",
+            }
         )
 
     @override_settings(KAVENEGAR_API_KEY="")
     def test_send_register_sms_requires_api_key(self):
         with self.assertRaises(KavenegarSMSConfigurationError):
-            send_register_sms("09123456789")
+            send_register_sms("09123456789", "Ali_Ahmadi")
 
     @override_settings(KAVENEGAR_API_KEY="test-api-key")
     def test_patient_creation_signal_sends_register_sms_after_commit(self):
@@ -202,7 +225,40 @@ class KavenegarRegisterSMSTests(TestCase):
                     mobile="09123456789",
                 )
 
-        send_sms.assert_called_once_with("09123456789")
+        send_sms.assert_called_once_with("09123456789", "Ali_Ahmadi")
+
+    @override_settings(KAVENEGAR_API_KEY="test-api-key")
+    def test_admin_action_sends_done_sms_to_selected_patients(self):
+        user = get_user_model().objects.create_superuser(
+            username="admin",
+            email="admin@example.com",
+            password="password",
+        )
+        self.client.force_login(user)
+        patient = Patient.objects.create(
+            first_name="Ali",
+            last_name="Ahmadi",
+            mobile="09123456789",
+            national_code="1111111111",
+        )
+
+        with patch("patients.admin.send_done_sms") as send_sms:
+            response = self.client.post(
+                reverse("admin:patients_patient_changelist"),
+                {
+                    "action": "send_done_sms_to_patients",
+                    "_selected_action": [str(patient.pk)],
+                    "index": "0",
+                },
+                follow=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        send_sms.assert_called_once_with("09123456789", "Ali_Ahmadi")
+        self.assertIn(
+            "پیامک انجام شد برای 1 بیمار ارسال شد.",
+            [message.message for message in get_messages(response.wsgi_request)],
+        )
 
     @override_settings(KAVENEGAR_API_KEY="test-api-key")
     def test_patient_update_signal_does_not_send_register_sms(self):
