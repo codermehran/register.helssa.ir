@@ -112,6 +112,7 @@
 .reveal--delay-6 { animation-delay: 0.6s; }
 .reveal--delay-7 { animation-delay: 0.7s; }
 .reveal--delay-8 { animation-delay: 0.8s; }
+.reveal--delay-9 { animation-delay: 0.9s; }
 
 * {
     box-sizing: border-box;
@@ -462,6 +463,84 @@ body > * {
     padding: 1.25rem 1.5rem;
     border-radius: 1.25rem;
     box-shadow: var(--shadow-soft);
+}
+
+.hero-social {
+    display: grid;
+    width: fit-content;
+    justify-items: center;
+    gap: 0.45rem;
+    margin: 1.25rem auto 0;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-border-translucent);
+    border-radius: 1.15rem;
+    background: var(--color-surface-translucent);
+    color: var(--color-text);
+    text-align: center;
+    text-decoration: none;
+    box-shadow: var(--shadow-soft);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.hero-social:hover,
+.hero-social:focus,
+.hero-social:focus-visible {
+    border-color: var(--color-primary);
+    box-shadow: 0 14px 30px var(--color-primary-shadow);
+    outline: none;
+    transform: translateY(-2px);
+}
+
+.hero-social__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.75rem;
+    height: 3.75rem;
+    border-radius: 1rem;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    box-shadow: 0 12px 24px var(--color-primary-shadow);
+}
+
+.hero-social__svg {
+    width: 2.7rem;
+    height: 2.7rem;
+}
+
+.hero-social__bubble {
+    fill: currentColor;
+    opacity: 0.2;
+}
+
+.hero-social__mark {
+    fill: currentColor;
+}
+
+.hero-social__line {
+    fill: none;
+    stroke: var(--color-primary);
+    stroke-linecap: round;
+    stroke-width: 2.4;
+}
+
+.hero-social__content {
+    display: grid;
+    gap: 0.05rem;
+}
+
+.hero-social__content strong {
+    color: var(--color-heading);
+    font-size: 1rem;
+    font-weight: 900;
+    line-height: 1.6;
+}
+
+.hero-social__content span {
+    overflow-wrap: anywhere;
+    color: var(--color-muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
 }
 
 .help-card ul {
