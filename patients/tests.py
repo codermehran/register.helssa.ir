@@ -174,9 +174,9 @@ class PatientRegistrationFormTests(TestCase):
 class KavenegarRegisterSMSTests(TestCase):
     @override_settings(
         KAVENEGAR_API_KEY="test-api-key",
-        KAVENEGAR_REGISTER_TEMPLATE="register",
+        KAVENEGAR_REGISTER_TEMPLATE="register-template",
     )
-    def test_send_register_sms_uses_name_as_register_template_token(self):
+    def test_send_register_sms_uses_configured_template_as_template_token(self):
         api = Mock()
         api.verify_lookup.return_value = {"return": {"status": 200}}
 
@@ -186,7 +186,11 @@ class KavenegarRegisterSMSTests(TestCase):
         self.assertEqual(result, {"return": {"status": 200}})
         build_api.assert_called_once_with("test-api-key")
         api.verify_lookup.assert_called_once_with(
-            {"receptor": "09123456789", "template": "register", "token": "Ali_Ahmadi"}
+            {
+                "receptor": "09123456789",
+                "template": "register-template",
+                "token": "Ali_Ahmadi",
+            }
         )
 
     @override_settings(
@@ -209,6 +213,13 @@ class KavenegarRegisterSMSTests(TestCase):
                 "token": "Ali_Ahmadi",
             }
         )
+
+    @override_settings(
+        KAVENEGAR_API_KEY="test-api-key", KAVENEGAR_REGISTER_TEMPLATE=""
+    )
+    def test_send_register_sms_requires_configured_template(self):
+        with self.assertRaises(KavenegarSMSConfigurationError):
+            send_register_sms("09123456789", "Ali_Ahmadi")
 
     @override_settings(KAVENEGAR_API_KEY="")
     def test_send_register_sms_requires_api_key(self):
