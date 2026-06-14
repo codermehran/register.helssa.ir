@@ -1,12 +1,14 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
 from django.db import DatabaseError, IntegrityError
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from .admin import SMSMessageLogAdmin, SMSMessageLogInline
 from .forms import (
     DUPLICATE_MOBILE_ERROR,
     DUPLICATE_NATIONAL_CODE_ERROR,
@@ -253,6 +255,27 @@ class KavenegarRegisterSMSTests(TestCase):
         self.assertEqual(sms_log.token, "Ali_Ahmadi")
         self.assertEqual(sms_log.status, SMSMessageLog.STATUS_SUCCESS)
 
+    def test_sms_message_log_preserves_history_when_patient_is_deleted(self):
+        patient = Patient.objects.create(
+            first_name="Ali",
+            last_name="Ahmadi",
+            mobile="09123456789",
+            national_code="1111111111",
+        )
+        sms_log = SMSMessageLog.objects.create(
+            patient=patient,
+            mobile=patient.mobile,
+            template="done-template",
+            token="Ali_Ahmadi",
+            status=SMSMessageLog.STATUS_SUCCESS,
+        )
+
+        patient.delete()
+        sms_log.refresh_from_db()
+
+        self.assertIsNone(sms_log.patient)
+        self.assertEqual(sms_log.mobile, "09123456789")
+
     @override_settings(
         KAVENEGAR_API_KEY="test-api-key", KAVENEGAR_DONE_TEMPLATE="done-template"
     )
@@ -291,6 +314,56 @@ class KavenegarRegisterSMSTests(TestCase):
             "پیامک انجام شد برای 1 بیمار ارسال شد.",
             [message.message for message in get_messages(response.wsgi_request)],
         )
+
+    @override_settings(KAVENEGAR_API_KEY="", KAVENEGAR_DONE_TEMPLATE="")
+    def test_admin_action_validates_kavenegar_settings_before_patient_loop(self):
+        user = get_user_model().objects.create_superuser(
+            username="admin",
+            email="admin@example.com",
+            password="password",
+        )
+        self.client.force_login(user)
+        patient = Patient.objects.create(
+            first_name="Ali",
+            last_name="Ahmadi",
+            mobile="09123456789",
+            national_code="1111111111",
+        )
+
+        with patch("patients.admin.send_done_sms") as send_sms:
+            response = self.client.post(
+                reverse("admin:patients_patient_changelist"),
+                {
+                    "action": "send_done_sms_to_patients",
+                    "_selected_action": [str(patient.pk)],
+                    "index": "0",
+                },
+                follow=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        send_sms.assert_not_called()
+        self.assertFalse(SMSMessageLog.objects.exists())
+        self.assertIn(
+            "تنظیمات سامانه پیامک (KAVENEGAR_API_KEY یا "
+            "KAVENEGAR_DONE_TEMPLATE) پیکربندی نشده است.",
+            [message.message for message in get_messages(response.wsgi_request)],
+        )
+
+    def test_sms_message_log_admin_views_do_not_allow_add_or_delete(self):
+        user = get_user_model().objects.create_superuser(
+            username="admin",
+            email="admin@example.com",
+            password="password",
+        )
+        request = Mock(user=user)
+        inline = SMSMessageLogInline(Patient, admin.site)
+        model_admin = SMSMessageLogAdmin(SMSMessageLog, admin.site)
+
+        self.assertFalse(inline.has_add_permission(request))
+        self.assertFalse(inline.has_delete_permission(request))
+        self.assertFalse(model_admin.has_add_permission(request))
+        self.assertFalse(model_admin.has_delete_permission(request))
 
     @override_settings(KAVENEGAR_API_KEY="test-api-key")
     def test_patient_update_signal_does_not_send_register_sms(self):

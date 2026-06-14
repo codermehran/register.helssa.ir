@@ -51,7 +51,9 @@ class Migration(migrations.Migration):
                 (
                     "patient",
                     models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
                         related_name="sms_logs",
                         to="patients.patient",
                         verbose_name="بیمار",

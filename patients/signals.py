@@ -20,10 +20,11 @@ def send_register_sms_after_patient_created(sender, instance, created, **kwargs)
         return
 
     def _send_sms():
-        template = getattr(settings, "KAVENEGAR_REGISTER_TEMPLATE", "")
+        template = ""
         token = build_patient_name_token(instance)
 
         try:
+            template = settings.KAVENEGAR_REGISTER_TEMPLATE
             response = send_register_sms(instance.mobile, token)
         except Exception as exc:
             create_sms_message_log(instance, template, token, error=exc)

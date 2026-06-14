@@ -21,6 +21,9 @@ class SMSMessageLogInline(admin.TabularInline):
     def has_add_permission(self, request, obj=None):
         return False
 
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 
 @admin.register(Patient)
 class PatientAdmin(admin.ModelAdmin):
@@ -32,9 +35,19 @@ class PatientAdmin(admin.ModelAdmin):
 
     @admin.action(description="ارسال پیامک انجام شد برای بیماران انتخاب‌شده")
     def send_done_sms_to_patients(self, request, queryset):
+        api_key = getattr(settings, "KAVENEGAR_API_KEY", "")
+        template = getattr(settings, "KAVENEGAR_DONE_TEMPLATE", "")
+        if not api_key or not template:
+            self.message_user(
+                request,
+                "تنظیمات سامانه پیامک (KAVENEGAR_API_KEY یا "
+                "KAVENEGAR_DONE_TEMPLATE) پیکربندی نشده است.",
+                messages.ERROR,
+            )
+            return
+
         sent_count = 0
         failed_count = 0
-        template = getattr(settings, "KAVENEGAR_DONE_TEMPLATE", "")
 
         for patient in queryset:
             token = build_patient_name_token(patient)
@@ -90,4 +103,7 @@ class SMSMessageLogAdmin(admin.ModelAdmin):
     ordering = ("-created_at",)
 
     def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False
