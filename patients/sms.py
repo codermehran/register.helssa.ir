@@ -1,3 +1,5 @@
+import re
+
 from django.conf import settings
 
 
@@ -11,10 +13,18 @@ def _build_kavenegar_api(api_key):
     return KavenegarAPI(api_key)
 
 
+def normalize_kavenegar_token_part(value):
+    """Replace every whitespace run with underscores for Kavenegar tokens."""
+
+    return re.sub(r"\s+", "_", value.strip())
+
+
 def build_patient_name_token(patient):
     """Build the Kavenegar token from a patient name."""
 
-    return f"{patient.first_name}_{patient.last_name}"
+    first_name = normalize_kavenegar_token_part(patient.first_name)
+    last_name = normalize_kavenegar_token_part(patient.last_name)
+    return f"{first_name}_{last_name}"
 
 
 def _get_required_sms_setting(setting_name):
