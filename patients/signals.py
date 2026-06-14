@@ -5,8 +5,9 @@ from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from .models import SMSMessageLog, Patient
+from .models import Patient
 from .sms import build_patient_name_token, send_register_sms
+from .sms_logs import create_sms_message_log
 
 logger = logging.getLogger(__name__)
 
@@ -25,25 +26,11 @@ def send_register_sms_after_patient_created(sender, instance, created, **kwargs)
         try:
             response = send_register_sms(instance.mobile, token)
         except Exception as exc:
-            SMSMessageLog.objects.create(
-                patient=instance,
-                mobile=instance.mobile,
-                template=template,
-                token=token,
-                status=SMSMessageLog.STATUS_FAILED,
-                error=str(exc),
-            )
+            create_sms_message_log(instance, template, token, error=exc)
             logger.exception(
                 "Failed to send Kavenegar register SMS to patient %s.", instance.pk
             )
         else:
-            SMSMessageLog.objects.create(
-                patient=instance,
-                mobile=instance.mobile,
-                template=template,
-                token=token,
-                status=SMSMessageLog.STATUS_SUCCESS,
-                response=str(response),
-            )
+            create_sms_message_log(instance, template, token, response=response)
 
     transaction.on_commit(_send_sms)

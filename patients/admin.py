@@ -5,6 +5,7 @@ from django.contrib import admin, messages
 
 from .models import SMSMessageLog, Patient
 from .sms import build_patient_name_token, send_done_sms
+from .sms_logs import create_sms_message_log
 
 logger = logging.getLogger(__name__)
 
@@ -42,27 +43,13 @@ class PatientAdmin(admin.ModelAdmin):
                 response = send_done_sms(patient.mobile, token)
             except Exception as exc:
                 failed_count += 1
-                SMSMessageLog.objects.create(
-                    patient=patient,
-                    mobile=patient.mobile,
-                    template=template,
-                    token=token,
-                    status=SMSMessageLog.STATUS_FAILED,
-                    error=str(exc),
-                )
+                create_sms_message_log(patient, template, token, error=exc)
                 logger.exception(
                     "Failed to send Kavenegar done SMS to patient %s.", patient.pk
                 )
             else:
                 sent_count += 1
-                SMSMessageLog.objects.create(
-                    patient=patient,
-                    mobile=patient.mobile,
-                    template=template,
-                    token=token,
-                    status=SMSMessageLog.STATUS_SUCCESS,
-                    response=str(response),
-                )
+                create_sms_message_log(patient, template, token, response=response)
 
         if sent_count:
             self.message_user(
