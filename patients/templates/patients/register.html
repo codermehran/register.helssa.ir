@@ -49,17 +49,65 @@
 
             <h1 id="page-title" class="reveal reveal--delay-2">{{ share_meta.site_name }}</h1>
 
-            <p class="reveal reveal--delay-3">
-                {{ share_meta.description }}
+            <p class="hero__lead reveal reveal--delay-3">
+                طرح جذب جمعیت پزشک خانواده در درمانگاه ولیعصر صغاد فعال شده است؛
+                ثبت‌نام اینترنتی انجام دهید تا درمانگاه برای تکمیل فرآیند با شما تماس بگیرد.
             </p>
+
+            <div class="hero__actions reveal reveal--delay-4" aria-label="اقدام سریع">
+                <a class="hero__button" href="#registration-form">ثبت‌نام سریع</a>
+                <span class="hero__note">مهم نیست پزشک خانواده فعلی شما چه کسی است.</span>
+            </div>
+
+            <div class="stats-strip reveal reveal--delay-5" aria-label="آمار ثبت‌نام">
+                <div class="stats-card stats-card--primary">
+                    <span class="stats-card__label">جامعه همراه طرح</span>
+                    <strong class="stats-card__number" data-counter data-target="{{ stats.community_count }}">۰</strong>
+                    <span class="stats-card__caption">نفر، شامل {{ stats.base_count }} نفر پایه طرح</span>
+                </div>
+            </div>
 
         </section>
 
-        <section class="form-card reveal reveal--delay-5" aria-labelledby="form-title">
+        <section class="promo-panel reveal reveal--delay-6" aria-labelledby="promo-title">
+            <div class="promo-panel__header">
+                <p class="eyebrow">چرا دکتر شبانی؟</p>
+                <h2 id="promo-title">خدمات منظم‌تر، هزینه کمتر، پیگیری واقعی سلامت خانواده</h2>
+                <p>
+                    با ثبت‌نام در طرح پزشک خانواده دکتر حسین شبانی شهرضا، دسترسی شما به خدمات درمانی
+                    درمانگاه ولیعصر صغاد ساده‌تر و قابل پیگیری‌تر می‌شود.
+                </p>
+            </div>
+
+            <div class="benefit-grid" aria-label="مزایای طرح">
+                <article class="benefit-card">
+                    <span class="benefit-card__icon" aria-hidden="true">۱</span>
+                    <h3>تعرفه دولتی</h3>
+                    <p>دریافت خدمات درمانی با هزینه کمتر و قابل پیش‌بینی‌تر.</p>
+                </article>
+                <article class="benefit-card">
+                    <span class="benefit-card__icon" aria-hidden="true">۲</span>
+                    <h3>خدمت‌رسانی ۱۶ ساعته</h3>
+                    <p>دسترسی منظم‌تر به خدمات پزشکی در بازه زمانی گسترده‌تر.</p>
+                </article>
+                <article class="benefit-card">
+                    <span class="benefit-card__icon" aria-hidden="true">۳</span>
+                    <h3>پاسخگویی آنلاین</h3>
+                    <p>پاسخگویی شبانه‌روزی ویژه افراد ثبت‌نام‌شده در طرح.</p>
+                </article>
+                <article class="benefit-card">
+                    <span class="benefit-card__icon" aria-hidden="true">۴</span>
+                    <h3>پیگیری سلامت</h3>
+                    <p>پیگیری مستمر وضعیت سلامت فرد و خانواده پس از ثبت‌نام.</p>
+                </article>
+            </div>
+        </section>
+
+        <section id="registration-form" class="form-card reveal reveal--delay-7" aria-labelledby="form-title">
             <div class="form-card__header">
                 <p class="eyebrow">فرم ثبت اطلاعات</p>
                 <h2 id="form-title">ثبت‌نام اولیه بیمار</h2>
-                <p>لطفاً مشخصات خود را دقیق وارد کنید.</p>
+                <p>فقط چند مشخصه لازم است؛ پس از ثبت، جهت تکمیل فرآیند با شما تماس گرفته می‌شود.</p>
             </div>
 
             {% if messages %}
@@ -226,30 +274,57 @@
             <h2>راهنمای کوتاه</h2>
             <ul>
                 <li>کد ملی را ۱۰ رقمی و شماره موبایل را ۱۱ رقمی وارد کنید.</li>
-                <li>پس از ثبت، پیام تأیید را همین‌جا می‌بینید.</li>
+                <li>پس از ثبت، پیام تأیید را همین‌جا می‌بینید و درمانگاه با شما تماس می‌گیرد.</li>
                 <li>اگر خطایی دیدید، همان بخش را اصلاح کنید.</li>
             </ul>
         </aside>
 
+        <a class="bottom-social-cta reveal reveal--delay-4" href="https://eitaa.ir/helssaa" target="_blank" rel="noopener noreferrer" aria-label="مشاهده صفحه هلسا در ایتا">
+            <span class="bottom-social-cta__icon" aria-hidden="true">
+                <svg class="bottom-social-cta__svg" width="22" height="22" viewBox="0 0 24 24" focusable="false">
+                    <path d="M20.7 4.1 3.9 10.6c-1.1.4-1.1 1.9.1 2.3l4.1 1.3 1.6 5c.3 1 1.6 1.3 2.3.5l2.4-2.8 4.2 3.1c.9.7 2.2.2 2.4-1l2.6-15.3c.2-1.1-.8-1.9-1.8-1.5Z"/>
+                    <path d="m8.2 14.1 9.6-7.2-7.2 8.8-.3 3.4"/>
+                </svg>
+            </span>
+            <span class="bottom-social-cta__content">
+                <strong>عضویت در کانال ایتا</strong>
+                <span dir="ltr">eitaa.ir/helssaa</span>
+            </span>
+        </a>
+
     </main>
-
-
-    <a class="bottom-social-cta reveal reveal--delay-4" href="https://eitaa.ir/helssaa" target="_blank" rel="noopener noreferrer" aria-label="مشاهده صفحه هلسا در ایتا">
-        <span class="bottom-social-cta__icon" aria-hidden="true">
-            <svg class="bottom-social-cta__svg" width="22" height="22" viewBox="0 0 24 24" focusable="false">
-                <path d="M20.7 4.1 3.9 10.6c-1.1.4-1.1 1.9.1 2.3l4.1 1.3 1.6 5c.3 1 1.6 1.3 2.3.5l2.4-2.8 4.2 3.1c.9.7 2.2.2 2.4-1l2.6-15.3c.2-1.1-.8-1.9-1.8-1.5Z"/>
-                <path d="m8.2 14.1 9.6-7.2-7.2 8.8-.3 3.4"/>
-            </svg>
-        </span>
-        <span class="bottom-social-cta__content">
-            <strong>عضویت در کانال ایتا</strong>
-            <span dir="ltr">eitaa.ir/helssaa</span>
-        </span>
-    </a>
 
     <script>
         (function () {
             var form = document.querySelector('[data-registration-form]');
+            var counters = document.querySelectorAll('[data-counter]');
+            var formatter = new Intl.NumberFormat('fa-IR');
+
+            function animateCounter(counter) {
+                var target = Number(counter.dataset.target || 0);
+                var duration = 4200;
+                var startTime = null;
+
+                function tick(timestamp) {
+                    if (!startTime) {
+                        startTime = timestamp;
+                    }
+
+                    var progress = Math.min((timestamp - startTime) / duration, 1);
+                    var eased = progress < 0.5
+                        ? 2 * progress * progress
+                        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                    counter.textContent = formatter.format(Math.round(target * eased));
+
+                    if (progress < 1) {
+                        window.requestAnimationFrame(tick);
+                    }
+                }
+
+                window.requestAnimationFrame(tick);
+            }
+
+            counters.forEach(animateCounter);
 
             if (!form) {
                 return;

@@ -17,6 +17,7 @@ from .forms import (
     PatientRegistrationForm,
 )
 from .views import (
+    COMMUNITY_BASE_COUNT,
     SHARE_DESCRIPTION,
     SHARE_IMAGE_PATH,
     SHARE_TITLE,
@@ -497,6 +498,32 @@ class RegisterPatientViewTests(TestCase):
         self.assertIsInstance(response.context["form"], PatientRegistrationForm)
         self.assertFalse(response.context["form"].is_bound)
 
+    def test_register_template_includes_animated_registration_stats(self):
+        Patient.objects.create(
+            first_name="Ali",
+            last_name="Ahmadi",
+            national_code="1234567890",
+            mobile="09123456789",
+        )
+        Patient.objects.create(
+            first_name="Reza",
+            last_name="Karimi",
+            national_code="1234567891",
+            mobile="09123456780",
+        )
+
+        response = self.client.get(reverse("patients:register"))
+
+        self.assertEqual(
+            response.context["stats"]["community_count"], COMMUNITY_BASE_COUNT + 2
+        )
+        self.assertContains(
+            response, f'data-counter data-target="{COMMUNITY_BASE_COUNT + 2}"'
+        )
+        self.assertNotContains(response, "ثبت‌نام‌شده در سایت")
+        self.assertContains(response, "چرا دکتر شبانی؟")
+        self.assertContains(response, "تعرفه دولتی")
+
     def test_register_template_uses_persian_labels_and_submit_text(self):
         response = self.client.get(reverse("patients:register"))
 
@@ -541,7 +568,7 @@ class RegisterPatientViewTests(TestCase):
         )
 
     def test_logo_instructions_document_required_image_files(self):
-        instructions = Path("logo.md").read_text()
+        instructions = Path("logo.md").read_text(encoding="utf-8")
 
         self.assertIn(SHARE_IMAGE_PATH, instructions)
         self.assertIn(SITE_LOGO_PATH, instructions)

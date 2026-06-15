@@ -9,16 +9,18 @@ from .forms import (
     DUPLICATE_NATIONAL_CODE_ERROR,
     PatientRegistrationForm,
 )
+from .models import Patient
 
 SAVE_ERROR = "در ذخیره‌سازی اطلاعات مشکلی رخ داد. لطفاً دوباره تلاش کنید."
 SITE_NAME = "سامانه ثبت نام پزشک خانواده دکتر حسین شبانی"
 SHARE_TITLE = SITE_NAME
 SHARE_DESCRIPTION = (
-    "سامانه ثبت نام پزشک خانواده دکتر حسین شبانی؛ برای تکمیل ثبت‌نام "
-    "اولیه و ثبت اطلاعات تماس بیماران."
+    "ثبت‌نام اینترنتی طرح پزشک خانواده دکتر حسین شبانی در درمانگاه ولیعصر صغاد؛ "
+    "خدمات درمانی با تعرفه دولتی، پیگیری سلامت خانواده و پاسخگویی آنلاین."
 )
 SHARE_IMAGE_PATH = "patients/images/share-logo.png"
 SITE_LOGO_PATH = "patients/images/site-logo.png"
+COMMUNITY_BASE_COUNT = 1008
 
 
 def _static_source_exists(path):
@@ -73,10 +75,21 @@ def register_patient(request):
             "alt": f"لوگوی {SITE_NAME}",
         }
 
+    registered_count = Patient.objects.count()
+    stats = {
+        "community_count": registered_count + COMMUNITY_BASE_COUNT,
+        "base_count": COMMUNITY_BASE_COUNT,
+    }
+
     return render(
         request,
         "patients/register.html",
-        {"form": form, "share_meta": share_meta, "site_logo": site_logo},
+        {
+            "form": form,
+            "share_meta": share_meta,
+            "site_logo": site_logo,
+            "stats": stats,
+        },
     )
 
 
