@@ -4,6 +4,7 @@ from django.conf import settings
 from django.contrib import admin, messages
 from django.db.models import Exists, OuterRef
 
+from .datetime import format_tehran_jalali
 from .models import SMSMessageLog, Patient
 from .sms import build_patient_name_token, send_done_sms
 from .sms_logs import create_sms_message_log
@@ -15,9 +16,13 @@ class SMSMessageLogInline(admin.TabularInline):
     model = SMSMessageLog
     extra = 0
     can_delete = False
-    fields = ("created_at", "template", "token", "status", "response", "error")
+    fields = ("created_at_jalali", "template", "token", "status", "response", "error")
     readonly_fields = fields
     ordering = ("-created_at",)
+
+    @admin.display(description="زمان ارسال", ordering="created_at")
+    def created_at_jalali(self, obj):
+        return format_tehran_jalali(obj.created_at)
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -33,7 +38,7 @@ class PatientAdmin(admin.ModelAdmin):
         "last_name",
         "national_code",
         "sms_sent_indicator",
-        "created_at",
+        "created_at_jalali",
     )
     search_fields = ("mobile", "national_code", "first_name", "last_name")
     ordering = ("-created_at",)
@@ -50,6 +55,10 @@ class PatientAdmin(admin.ModelAdmin):
     @admin.display(description="پیامک", boolean=True, ordering="has_successful_sms")
     def sms_sent_indicator(self, obj):
         return getattr(obj, "has_successful_sms", False)
+
+    @admin.display(description="زمان ثبت", ordering="created_at")
+    def created_at_jalali(self, obj):
+        return format_tehran_jalali(obj.created_at)
 
     @admin.action(description="ارسال پیامک انجام شد برای بیماران انتخاب‌شده")
     def send_done_sms_to_patients(self, request, queryset):
@@ -99,7 +108,7 @@ class PatientAdmin(admin.ModelAdmin):
 
 @admin.register(SMSMessageLog)
 class SMSMessageLogAdmin(admin.ModelAdmin):
-    list_display = ("patient", "mobile", "template", "status", "created_at")
+    list_display = ("patient", "mobile", "template", "status", "created_at_jalali")
     list_filter = ("status", "template", "created_at")
     search_fields = (
         "patient__first_name",
@@ -116,9 +125,13 @@ class SMSMessageLogAdmin(admin.ModelAdmin):
         "status",
         "response",
         "error",
-        "created_at",
+        "created_at_jalali",
     )
     ordering = ("-created_at",)
+
+    @admin.display(description="زمان ارسال", ordering="created_at")
+    def created_at_jalali(self, obj):
+        return format_tehran_jalali(obj.created_at)
 
     def has_add_permission(self, request):
         return False
