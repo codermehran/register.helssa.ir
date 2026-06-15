@@ -1,3 +1,4 @@
+from datetime import datetime, timezone as datetime_timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -9,6 +10,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .admin import PatientAdmin, SMSMessageLogAdmin, SMSMessageLogInline
+from .datetime import format_tehran_jalali
 from .forms import (
     DUPLICATE_MOBILE_ERROR,
     DUPLICATE_NATIONAL_CODE_ERROR,
@@ -33,6 +35,13 @@ from .sms import (
 class PatientModelTests(TestCase):
     def test_mobile_field_is_unique(self):
         self.assertTrue(Patient._meta.get_field("mobile").unique)
+
+
+class PersianDateTimeFormatTests(TestCase):
+    def test_format_tehran_jalali_converts_utc_to_tehran_and_jalali(self):
+        value = datetime(2026, 3, 20, 20, 45, 10, tzinfo=datetime_timezone.utc)
+
+        self.assertEqual(format_tehran_jalali(value), "۱۴۰۵/۰۱/۰۱ ۰۰:۱۵:۱۰")
 
 
 class PatientRegistrationFormTests(TestCase):
@@ -360,7 +369,7 @@ class KavenegarRegisterSMSTests(TestCase):
                 "last_name",
                 "national_code",
                 "sms_sent_indicator",
-                "created_at",
+                "created_at_jalali",
             ),
         )
         self.assertNotIn("mobile", model_admin.list_display)
@@ -417,6 +426,30 @@ class KavenegarRegisterSMSTests(TestCase):
         patient_from_admin = model_admin.get_queryset(request).get(pk=patient.pk)
 
         self.assertFalse(model_admin.sms_sent_indicator(patient_from_admin))
+
+
+    def test_admin_created_at_uses_jalali_date_and_tehran_time(self):
+        model_admin = PatientAdmin(Patient, admin.site)
+        patient = Patient(
+            first_name="Ali",
+            last_name="Ahmadi",
+            mobile="09123456789",
+            created_at=datetime(2026, 3, 20, 20, 45, 10, tzinfo=datetime_timezone.utc),
+        )
+
+        self.assertEqual(model_admin.created_at_jalali(patient), "۱۴۰۵/۰۱/۰۱ ۰۰:۱۵:۱۰")
+
+    def test_sms_log_admin_created_at_uses_jalali_date_and_tehran_time(self):
+        model_admin = SMSMessageLogAdmin(SMSMessageLog, admin.site)
+        sms_log = SMSMessageLog(
+            mobile="09123456789",
+            template="done-template",
+            token="Ali_Ahmadi",
+            status=SMSMessageLog.STATUS_SUCCESS,
+            created_at=datetime(2026, 6, 15, 8, 30, 5, tzinfo=datetime_timezone.utc),
+        )
+
+        self.assertEqual(model_admin.created_at_jalali(sms_log), "۱۴۰۵/۰۳/۲۵ ۱۲:۰۰:۰۵")
 
     def test_sms_message_log_admin_views_do_not_allow_add_or_delete(self):
         user = get_user_model().objects.create_superuser(
