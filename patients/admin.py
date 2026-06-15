@@ -3,7 +3,6 @@ import logging
 from django.conf import settings
 from django.contrib import admin, messages
 from django.db.models import Exists, OuterRef
-from django.utils.html import format_html
 
 from .models import SMSMessageLog, Patient
 from .sms import build_patient_name_token, send_done_sms
@@ -48,15 +47,9 @@ class PatientAdmin(admin.ModelAdmin):
         )
         return queryset.annotate(has_successful_sms=Exists(successful_sms_logs))
 
-    @admin.display(description="پیامک", boolean=False, ordering="has_successful_sms")
+    @admin.display(description="پیامک", boolean=True, ordering="has_successful_sms")
     def sms_sent_indicator(self, obj):
-        if not getattr(obj, "has_successful_sms", False):
-            return ""
-
-        return format_html(
-            '<span style="color: #198754; font-size: 1.2rem;" '
-            'title="پیامک با موفقیت ارسال شده است">✔</span>'
-        )
+        return getattr(obj, "has_successful_sms", False)
 
     @admin.action(description="ارسال پیامک انجام شد برای بیماران انتخاب‌شده")
     def send_done_sms_to_patients(self, request, queryset):

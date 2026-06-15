@@ -390,7 +390,7 @@ class KavenegarRegisterSMSTests(TestCase):
 
         patient_from_admin = model_admin.get_queryset(request).get(pk=patient.pk)
 
-        self.assertIn("✔", model_admin.sms_sent_indicator(patient_from_admin))
+        self.assertTrue(model_admin.sms_sent_indicator(patient_from_admin))
 
     def test_patient_admin_does_not_mark_patients_without_successful_sms(self):
         user = get_user_model().objects.create_superuser(
@@ -416,7 +416,7 @@ class KavenegarRegisterSMSTests(TestCase):
 
         patient_from_admin = model_admin.get_queryset(request).get(pk=patient.pk)
 
-        self.assertEqual(model_admin.sms_sent_indicator(patient_from_admin), "")
+        self.assertFalse(model_admin.sms_sent_indicator(patient_from_admin))
 
     def test_sms_message_log_admin_views_do_not_allow_add_or_delete(self):
         user = get_user_model().objects.create_superuser(
