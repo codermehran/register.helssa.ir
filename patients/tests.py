@@ -43,6 +43,11 @@ class PersianDateTimeFormatTests(TestCase):
 
         self.assertEqual(format_tehran_jalali(value), "۱۴۰۵/۰۱/۰۱ ۰۰:۱۵:۱۰")
 
+    def test_format_tehran_jalali_handles_naive_datetime(self):
+        value = datetime(2026, 3, 20, 20, 45, 10)
+
+        self.assertEqual(format_tehran_jalali(value), "۱۴۰۴/۱۲/۲۹ ۲۰:۴۵:۱۰")
+
 
 class PatientRegistrationFormTests(TestCase):
     def test_valid_registration_form(self):

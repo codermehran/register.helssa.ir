@@ -60,6 +60,9 @@ def format_tehran_jalali(value):
     if value is None:
         return "-"
 
+    if timezone.is_naive(value):
+        value = timezone.make_aware(value)
+
     local_value = timezone.localtime(value)
     jalali_year, jalali_month, jalali_day = _gregorian_to_jalali(
         local_value.year, local_value.month, local_value.day
