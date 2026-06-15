@@ -8,7 +8,7 @@ from django.db import DatabaseError, IntegrityError
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from .admin import SMSMessageLogAdmin, SMSMessageLogInline
+from .admin import PatientAdmin, SMSMessageLogAdmin, SMSMessageLogInline
 from .forms import (
     DUPLICATE_MOBILE_ERROR,
     DUPLICATE_NATIONAL_CODE_ERROR,
@@ -349,6 +349,74 @@ class KavenegarRegisterSMSTests(TestCase):
             "KAVENEGAR_DONE_TEMPLATE) پیکربندی نشده است.",
             [message.message for message in get_messages(response.wsgi_request)],
         )
+
+    def test_patient_admin_list_shows_national_code_instead_of_mobile(self):
+        model_admin = PatientAdmin(Patient, admin.site)
+
+        self.assertEqual(
+            model_admin.list_display,
+            (
+                "first_name",
+                "last_name",
+                "national_code",
+                "sms_sent_indicator",
+                "created_at",
+            ),
+        )
+        self.assertNotIn("mobile", model_admin.list_display)
+        self.assertIn("mobile", model_admin.get_fields(request=Mock()))
+
+    def test_patient_admin_marks_patients_with_successful_sms(self):
+        user = get_user_model().objects.create_superuser(
+            username="admin",
+            email="admin@example.com",
+            password="password",
+        )
+        patient = Patient.objects.create(
+            first_name="Ali",
+            last_name="Ahmadi",
+            mobile="09123456789",
+            national_code="1111111111",
+        )
+        SMSMessageLog.objects.create(
+            patient=patient,
+            mobile=patient.mobile,
+            template="register-template",
+            token="Ali_Ahmadi",
+            status=SMSMessageLog.STATUS_SUCCESS,
+        )
+        request = Mock(user=user)
+        model_admin = PatientAdmin(Patient, admin.site)
+
+        patient_from_admin = model_admin.get_queryset(request).get(pk=patient.pk)
+
+        self.assertIn("✔", model_admin.sms_sent_indicator(patient_from_admin))
+
+    def test_patient_admin_does_not_mark_patients_without_successful_sms(self):
+        user = get_user_model().objects.create_superuser(
+            username="admin",
+            email="admin@example.com",
+            password="password",
+        )
+        patient = Patient.objects.create(
+            first_name="Ali",
+            last_name="Ahmadi",
+            mobile="09123456789",
+            national_code="1111111111",
+        )
+        SMSMessageLog.objects.create(
+            patient=patient,
+            mobile=patient.mobile,
+            template="register-template",
+            token="Ali_Ahmadi",
+            status=SMSMessageLog.STATUS_FAILED,
+        )
+        request = Mock(user=user)
+        model_admin = PatientAdmin(Patient, admin.site)
+
+        patient_from_admin = model_admin.get_queryset(request).get(pk=patient.pk)
+
+        self.assertEqual(model_admin.sms_sent_indicator(patient_from_admin), "")
 
     def test_sms_message_log_admin_views_do_not_allow_add_or_delete(self):
         user = get_user_model().objects.create_superuser(

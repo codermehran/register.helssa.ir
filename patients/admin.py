@@ -2,6 +2,8 @@ import logging
 
 from django.conf import settings
 from django.contrib import admin, messages
+from django.db.models import Exists, OuterRef
+from django.utils.html import format_html
 
 from .models import SMSMessageLog, Patient
 from .sms import build_patient_name_token, send_done_sms
@@ -27,11 +29,34 @@ class SMSMessageLogInline(admin.TabularInline):
 
 @admin.register(Patient)
 class PatientAdmin(admin.ModelAdmin):
-    list_display = ("first_name", "last_name", "mobile", "created_at")
-    search_fields = ("mobile", "first_name", "last_name")
+    list_display = (
+        "first_name",
+        "last_name",
+        "national_code",
+        "sms_sent_indicator",
+        "created_at",
+    )
+    search_fields = ("mobile", "national_code", "first_name", "last_name")
     ordering = ("-created_at",)
     actions = ("send_done_sms_to_patients",)
     inlines = (SMSMessageLogInline,)
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        successful_sms_logs = SMSMessageLog.objects.filter(
+            patient=OuterRef("pk"), status=SMSMessageLog.STATUS_SUCCESS
+        )
+        return queryset.annotate(has_successful_sms=Exists(successful_sms_logs))
+
+    @admin.display(description="پیامک", boolean=False, ordering="has_successful_sms")
+    def sms_sent_indicator(self, obj):
+        if not getattr(obj, "has_successful_sms", False):
+            return ""
+
+        return format_html(
+            '<span style="color: #198754; font-size: 1.2rem;" '
+            'title="پیامک با موفقیت ارسال شده است">✔</span>'
+        )
 
     @admin.action(description="ارسال پیامک انجام شد برای بیماران انتخاب‌شده")
     def send_done_sms_to_patients(self, request, queryset):
