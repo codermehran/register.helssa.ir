@@ -39,6 +39,8 @@
     <link rel="stylesheet" href="{% static 'patients/css/style.css' %}">
 </head>
 <body>
+    <div class="scroll-progress" aria-hidden="true"></div>
+
     <main class="registration-page">
         <section class="hero" aria-labelledby="page-title">
             {% if site_logo %}
@@ -57,6 +59,19 @@
             <div class="hero__actions reveal reveal--delay-4" aria-label="اقدام سریع">
                 <a class="hero__button" href="#registration-form">ثبت‌نام سریع</a>
                 <span class="hero__note">مهم نیست پزشک خانواده فعلی شما چه کسی است.</span>
+            </div>
+
+            <div class="hero__visual reveal reveal--delay-5" data-parallax="0.12" aria-hidden="true">
+                <div class="hero-device">
+                    <span class="hero-device__bar"></span>
+                    <span class="hero-device__line hero-device__line--wide"></span>
+                    <span class="hero-device__line"></span>
+                    <div class="hero-device__grid">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
             </div>
 
             <div class="stats-strip reveal reveal--delay-5" aria-label="آمار ثبت‌نام">
@@ -99,6 +114,49 @@
                     <span class="benefit-card__icon" aria-hidden="true">۴</span>
                     <h3>پیگیری سلامت</h3>
                     <p>پیگیری مستمر وضعیت سلامت فرد و خانواده پس از ثبت‌نام.</p>
+                </article>
+            </div>
+        </section>
+
+        <section class="flow-section" aria-labelledby="flow-title">
+            <div class="flow-section__copy reveal">
+                <p class="eyebrow">مسیر ثبت‌نام</p>
+                <h2 id="flow-title">ثبت اطلاعات، بررسی، تماس درمانگاه</h2>
+                <p>
+                    مراحل ثبت‌نام کوتاه و مشخص است؛ پس از تکمیل فرم، پیگیری درمانگاه از روی اطلاعات ثبت‌شده انجام می‌شود.
+                </p>
+            </div>
+
+            <div class="flow-track" aria-label="مراحل ثبت‌نام">
+                <article class="flow-step reveal" data-step="01">
+                    <span class="flow-step__icon" aria-hidden="true">
+                        <svg class="icon" viewBox="0 0 24 24" focusable="false">
+                            <path d="M5 4.5h14v15H5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                            <path d="M8 8.5h8M8 12h8M8 15.5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                        </svg>
+                    </span>
+                    <h3>ورود مشخصات</h3>
+                    <p>نام، کد ملی و شماره موبایل را در چند ثانیه وارد می‌کنید.</p>
+                </article>
+
+                <article class="flow-step reveal" data-step="02">
+                    <span class="flow-step__icon" aria-hidden="true">
+                        <svg class="icon" viewBox="0 0 24 24" focusable="false">
+                            <path d="m5 12.4 4.2 4.2L19 6.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </span>
+                    <h3>ثبت امن</h3>
+                    <p>اطلاعات تکراری بررسی می‌شود و نتیجه ثبت همان لحظه نمایش داده می‌شود.</p>
+                </article>
+
+                <article class="flow-step reveal" data-step="03">
+                    <span class="flow-step__icon" aria-hidden="true">
+                        <svg class="icon" viewBox="0 0 24 24" focusable="false">
+                            <path d="M7.4 5.2 9 8.8l-1.4 1.4c1 2 2.4 3.4 4.4 4.4l1.4-1.4 3.6 1.6-.6 3.2c-.2 1-1.1 1.7-2.1 1.6C8.5 19.1 4.9 15.5 4.4 9.7c-.1-1 .6-1.9 1.6-2.1l1.4-.4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                        </svg>
+                    </span>
+                    <h3>تماس درمانگاه</h3>
+                    <p>برای تکمیل فرآیند، درمانگاه با شماره ثبت‌شده تماس می‌گیرد.</p>
                 </article>
             </div>
         </section>
@@ -298,11 +356,27 @@
         (function () {
             var form = document.querySelector('[data-registration-form]');
             var counters = document.querySelectorAll('[data-counter]');
+            var revealItems = document.querySelectorAll('.reveal');
+            var parallaxItems = document.querySelectorAll('[data-parallax]');
             var formatter = new Intl.NumberFormat('fa-IR');
+            var counterStarted = false;
+
+            function updateScrollProgress() {
+                var scrollable = document.documentElement.scrollHeight - window.innerHeight;
+                var progress = scrollable > 0 ? window.scrollY / scrollable : 0;
+                document.documentElement.style.setProperty('--scroll-progress', Math.max(0, Math.min(progress, 1)));
+
+                parallaxItems.forEach(function (item) {
+                    var depth = Number(item.dataset.parallax || 0);
+                    var rect = item.getBoundingClientRect();
+                    var centerOffset = rect.top + rect.height / 2 - window.innerHeight / 2;
+                    item.style.setProperty('--parallax-y', (centerOffset * depth * -0.12).toFixed(2) + 'px');
+                });
+            }
 
             function animateCounter(counter) {
                 var target = Number(counter.dataset.target || 0);
-                var duration = 4200;
+                var duration = 1600;
                 var startTime = null;
 
                 function tick(timestamp) {
@@ -324,7 +398,51 @@
                 window.requestAnimationFrame(tick);
             }
 
-            counters.forEach(animateCounter);
+            function startCounters() {
+                if (counterStarted) {
+                    return;
+                }
+
+                counterStarted = true;
+                counters.forEach(animateCounter);
+            }
+
+            if ('IntersectionObserver' in window) {
+                var revealObserver = new IntersectionObserver(function (entries) {
+                    entries.forEach(function (entry) {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('is-visible');
+                            revealObserver.unobserve(entry.target);
+                        }
+                    });
+                }, { threshold: 0.08, rootMargin: '0px 0px 14% 0px' });
+
+                revealItems.forEach(function (item) {
+                    revealObserver.observe(item);
+                });
+
+                var counterObserver = new IntersectionObserver(function (entries) {
+                    entries.forEach(function (entry) {
+                        if (entry.isIntersecting) {
+                            startCounters();
+                            counterObserver.disconnect();
+                        }
+                    });
+                }, { threshold: 0.45 });
+
+                counters.forEach(function (counter) {
+                    counterObserver.observe(counter);
+                });
+            } else {
+                revealItems.forEach(function (item) {
+                    item.classList.add('is-visible');
+                });
+                startCounters();
+            }
+
+            updateScrollProgress();
+            window.addEventListener('scroll', updateScrollProgress, { passive: true });
+            window.addEventListener('resize', updateScrollProgress);
 
             if (!form) {
                 return;
