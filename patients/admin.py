@@ -1,8 +1,10 @@
+import ast
 import logging
 
 from django.conf import settings
 from django.contrib import admin, messages
 from django.db.models import Exists, OuterRef
+from django.utils.html import format_html, format_html_join
 
 from .datetime import format_tehran_jalali
 from .models import SMSMessageLog, Patient
@@ -12,17 +14,106 @@ from .sms_logs import create_sms_message_log
 logger = logging.getLogger(__name__)
 
 
+SMS_RESPONSE_LABELS = {
+    "messageid": "شناسه پیامک",
+    "message": "متن پیام",
+    "status": "کد وضعیت",
+    "statustext": "وضعیت سرویس",
+    "sender": "فرستنده",
+    "receptor": "گیرنده",
+    "date": "زمان سرویس",
+    "cost": "هزینه",
+}
+
+
+def _parse_sms_response(response):
+    if not response:
+        return []
+
+    try:
+        parsed_response = ast.literal_eval(response)
+    except (ValueError, SyntaxError):
+        return response
+
+    if isinstance(parsed_response, dict):
+        return [parsed_response]
+
+    if isinstance(parsed_response, list):
+        return [item for item in parsed_response if isinstance(item, dict)]
+
+    return response
+
+
+def format_sms_response(response):
+    parsed_response = _parse_sms_response(response)
+    if not parsed_response:
+        return "-"
+
+    if isinstance(parsed_response, str):
+        return format_html(
+            '<div style="white-space: pre-wrap; direction: rtl; text-align: right;">{}</div>',
+            parsed_response,
+        )
+
+    cards = []
+    for item in parsed_response:
+        rows = []
+        for key, label in SMS_RESPONSE_LABELS.items():
+            value = item.get(key)
+            if value in (None, ""):
+                continue
+            rows.append(
+                format_html(
+                    '<div style="display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(128,128,128,.18);">'
+                    '<strong style="color: #888;">{}</strong>'
+                    '<span style="white-space: pre-wrap; overflow-wrap: anywhere; direction: rtl; text-align: right;">{}</span>'
+                    "</div>",
+                    label,
+                    value,
+                )
+            )
+
+        cards.append(
+            format_html(
+                '<div style="min-width: 260px; max-width: 520px; line-height: 1.9; direction: rtl; text-align: right;">{}</div>',
+                format_html_join("", "{}", ((row,) for row in rows)),
+            )
+        )
+
+    return format_html_join("", "{}", ((card,) for card in cards))
+
+
 class SMSMessageLogInline(admin.TabularInline):
     model = SMSMessageLog
     extra = 0
     can_delete = False
-    fields = ("created_at_jalali", "template", "token", "status", "response", "error")
+    fields = (
+        "created_at_jalali",
+        "template",
+        "token",
+        "status",
+        "formatted_response",
+        "formatted_error",
+    )
     readonly_fields = fields
     ordering = ("-created_at",)
 
     @admin.display(description="زمان ارسال", ordering="created_at")
     def created_at_jalali(self, obj):
         return format_tehran_jalali(obj.created_at)
+
+    @admin.display(description="پاسخ سرویس")
+    def formatted_response(self, obj):
+        return format_sms_response(obj.response)
+
+    @admin.display(description="خطا")
+    def formatted_error(self, obj):
+        if not obj.error:
+            return "-"
+        return format_html(
+            '<div style="white-space: pre-wrap; overflow-wrap: anywhere; direction: rtl; text-align: right;">{}</div>',
+            obj.error,
+        )
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -131,8 +222,8 @@ class SMSMessageLogAdmin(admin.ModelAdmin):
         "template",
         "token",
         "status",
-        "response",
-        "error",
+        "formatted_response",
+        "formatted_error",
         "created_at_jalali",
     )
     ordering = ("-created_at",)
@@ -140,6 +231,19 @@ class SMSMessageLogAdmin(admin.ModelAdmin):
     @admin.display(description="زمان ارسال", ordering="created_at")
     def created_at_jalali(self, obj):
         return format_tehran_jalali(obj.created_at)
+
+    @admin.display(description="پاسخ سرویس")
+    def formatted_response(self, obj):
+        return format_sms_response(obj.response)
+
+    @admin.display(description="خطا")
+    def formatted_error(self, obj):
+        if not obj.error:
+            return "-"
+        return format_html(
+            '<div style="white-space: pre-wrap; overflow-wrap: anywhere; direction: rtl; text-align: right;">{}</div>',
+            obj.error,
+        )
 
     def has_add_permission(self, request):
         return False
