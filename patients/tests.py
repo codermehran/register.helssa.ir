@@ -9,7 +9,12 @@ from django.db import DatabaseError, IntegrityError
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from .admin import PatientAdmin, SMSMessageLogAdmin, SMSMessageLogInline
+from .admin import (
+    PatientAdmin,
+    SMSMessageLogAdmin,
+    SMSMessageLogInline,
+    format_sms_response,
+)
 from .datetime import format_tehran_jalali
 from .forms import (
     DUPLICATE_MOBILE_ERROR,
@@ -484,6 +489,37 @@ class KavenegarRegisterSMSTests(TestCase):
         )
 
         self.assertEqual(model_admin.created_at_jalali(sms_log), "۱۴۰۵/۰۳/۲۵ ۱۲:۰۰:۰۵")
+
+    def test_sms_response_is_formatted_for_admin_display(self):
+        response = repr(
+            [
+                {
+                    "messageid": 1540699584,
+                    "message": "درخواست شما\nثبت شد",
+                    "status": 5,
+                    "statustext": "ارسال به مخابرات",
+                    "sender": "10004347",
+                    "receptor": "09164521571",
+                    "date": 1781688729,
+                    "cost": 2910,
+                }
+            ]
+        )
+
+        formatted_response = str(format_sms_response(response))
+
+        self.assertIn("شناسه پیامک", formatted_response)
+        self.assertIn("1540699584", formatted_response)
+        self.assertIn("متن پیام", formatted_response)
+        self.assertIn("درخواست شما\nثبت شد", formatted_response)
+        self.assertIn("وضعیت سرویس", formatted_response)
+        self.assertIn("ارسال به مخابرات", formatted_response)
+        self.assertNotIn("messageid", formatted_response)
+
+    def test_sms_response_preserves_unparseable_text(self):
+        formatted_response = str(format_sms_response("raw error response"))
+
+        self.assertIn("raw error response", formatted_response)
 
     def test_sms_message_log_admin_views_do_not_allow_add_or_delete(self):
         user = get_user_model().objects.create_superuser(
