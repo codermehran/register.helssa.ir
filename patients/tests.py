@@ -381,7 +381,62 @@ class KavenegarRegisterSMSTests(TestCase):
         self.assertNotIn("mobile", model_admin.list_display)
         self.assertIn("mobile", model_admin.get_fields(request=Mock()))
 
-    def test_patient_admin_marks_patients_with_successful_sms(self):
+    @override_settings(KAVENEGAR_DONE_TEMPLATE="done-template")
+    def test_patient_admin_marks_patients_with_successful_done_sms(self):
+        user = get_user_model().objects.create_superuser(
+            username="admin",
+            email="admin@example.com",
+            password="password",
+        )
+        patient = Patient.objects.create(
+            first_name="Ali",
+            last_name="Ahmadi",
+            mobile="09123456789",
+            national_code="1111111111",
+        )
+        SMSMessageLog.objects.create(
+            patient=patient,
+            mobile=patient.mobile,
+            template="done-template",
+            token="Ali_Ahmadi",
+            status=SMSMessageLog.STATUS_SUCCESS,
+        )
+        request = Mock(user=user)
+        model_admin = PatientAdmin(Patient, admin.site)
+
+        patient_from_admin = model_admin.get_queryset(request).get(pk=patient.pk)
+
+        self.assertTrue(model_admin.sms_sent_indicator(patient_from_admin))
+
+    @override_settings(KAVENEGAR_DONE_TEMPLATE="done-template")
+    def test_patient_admin_does_not_mark_patients_without_successful_done_sms(self):
+        user = get_user_model().objects.create_superuser(
+            username="admin",
+            email="admin@example.com",
+            password="password",
+        )
+        patient = Patient.objects.create(
+            first_name="Ali",
+            last_name="Ahmadi",
+            mobile="09123456789",
+            national_code="1111111111",
+        )
+        SMSMessageLog.objects.create(
+            patient=patient,
+            mobile=patient.mobile,
+            template="done-template",
+            token="Ali_Ahmadi",
+            status=SMSMessageLog.STATUS_FAILED,
+        )
+        request = Mock(user=user)
+        model_admin = PatientAdmin(Patient, admin.site)
+
+        patient_from_admin = model_admin.get_queryset(request).get(pk=patient.pk)
+
+        self.assertFalse(model_admin.sms_sent_indicator(patient_from_admin))
+
+    @override_settings(KAVENEGAR_DONE_TEMPLATE="done-template")
+    def test_patient_admin_ignores_successful_non_done_sms(self):
         user = get_user_model().objects.create_superuser(
             username="admin",
             email="admin@example.com",
@@ -405,34 +460,7 @@ class KavenegarRegisterSMSTests(TestCase):
 
         patient_from_admin = model_admin.get_queryset(request).get(pk=patient.pk)
 
-        self.assertTrue(model_admin.sms_sent_indicator(patient_from_admin))
-
-    def test_patient_admin_does_not_mark_patients_without_successful_sms(self):
-        user = get_user_model().objects.create_superuser(
-            username="admin",
-            email="admin@example.com",
-            password="password",
-        )
-        patient = Patient.objects.create(
-            first_name="Ali",
-            last_name="Ahmadi",
-            mobile="09123456789",
-            national_code="1111111111",
-        )
-        SMSMessageLog.objects.create(
-            patient=patient,
-            mobile=patient.mobile,
-            template="register-template",
-            token="Ali_Ahmadi",
-            status=SMSMessageLog.STATUS_FAILED,
-        )
-        request = Mock(user=user)
-        model_admin = PatientAdmin(Patient, admin.site)
-
-        patient_from_admin = model_admin.get_queryset(request).get(pk=patient.pk)
-
         self.assertFalse(model_admin.sms_sent_indicator(patient_from_admin))
-
 
     def test_admin_created_at_uses_jalali_date_and_tehran_time(self):
         model_admin = PatientAdmin(Patient, admin.site)

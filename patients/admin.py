@@ -47,14 +47,22 @@ class PatientAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
-        successful_sms_logs = SMSMessageLog.objects.filter(
-            patient=OuterRef("pk"), status=SMSMessageLog.STATUS_SUCCESS
+        successful_done_sms_logs = SMSMessageLog.objects.filter(
+            patient=OuterRef("pk"),
+            status=SMSMessageLog.STATUS_SUCCESS,
+            template=getattr(settings, "KAVENEGAR_DONE_TEMPLATE", ""),
         )
-        return queryset.annotate(has_successful_sms=Exists(successful_sms_logs))
+        return queryset.annotate(
+            has_successful_done_sms=Exists(successful_done_sms_logs)
+        )
 
-    @admin.display(description="پیامک", boolean=True, ordering="has_successful_sms")
+    @admin.display(
+        description="پیامک انجام شد",
+        boolean=True,
+        ordering="has_successful_done_sms",
+    )
     def sms_sent_indicator(self, obj):
-        return getattr(obj, "has_successful_sms", False)
+        return getattr(obj, "has_successful_done_sms", False)
 
     @admin.display(description="زمان ثبت", ordering="created_at")
     def created_at_jalali(self, obj):
