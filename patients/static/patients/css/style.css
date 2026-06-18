@@ -845,6 +845,20 @@ body > * {
     line-height: 1.4;
 }
 
+.site-footer {
+    justify-self: center;
+    padding: 0.25rem 0 0;
+    color: var(--hint);
+    text-align: center;
+}
+
+.site-footer p {
+    margin: 0;
+    font-size: 0.84rem;
+    font-weight: 700;
+    line-height: 1.7;
+}
+
 .reveal {
     opacity: 0;
     transform: translateY(26px) scale(0.98);

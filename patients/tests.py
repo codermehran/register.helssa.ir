@@ -624,6 +624,12 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(response, "شماره موبایل")
         self.assertContains(response, ">ثبت‌نام</button>")
 
+    def test_register_template_includes_standard_copyright_footer(self):
+        response = self.client.get(reverse("patients:register"))
+
+        self.assertContains(response, '<footer class="site-footer')
+        self.assertContains(response, "&copy; 2026 Helssa. All rights reserved.")
+
     def test_register_template_includes_share_preview_metadata(self):
         response = self.client.get(reverse("patients:register"))
 
