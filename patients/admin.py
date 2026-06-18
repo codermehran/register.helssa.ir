@@ -2,6 +2,7 @@ import ast
 import logging
 from datetime import datetime, timezone as datetime_timezone
 
+from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
 from django.db.models import Exists, OuterRef
@@ -13,6 +14,23 @@ from .sms import build_patient_name_token, send_done_sms
 from .sms_logs import create_sms_message_log
 
 logger = logging.getLogger(__name__)
+
+
+class PatientAdminForm(forms.ModelForm):
+    class Meta:
+        model = Patient
+        fields = "__all__"
+        widgets = {
+            "national_code": forms.TextInput(
+                attrs={
+                    "class": "vTextField",
+                    "data-copy-national-code": "true",
+                    "dir": "ltr",
+                    "inputmode": "numeric",
+                    "maxlength": "10",
+                }
+            )
+        }
 
 
 SMS_RESPONSE_LABELS = {
@@ -140,6 +158,7 @@ class SMSMessageLogInline(admin.TabularInline):
 
 @admin.register(Patient)
 class PatientAdmin(admin.ModelAdmin):
+    form = PatientAdminForm
     list_display = (
         "first_name",
         "last_name",
@@ -151,6 +170,10 @@ class PatientAdmin(admin.ModelAdmin):
     ordering = ("-created_at",)
     actions = ("send_done_sms_to_patients",)
     inlines = (SMSMessageLogInline,)
+
+    class Media:
+        css = {"all": ("patients/admin/copy_national_code.css",)}
+        js = ("patients/admin/copy_national_code.js",)
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)

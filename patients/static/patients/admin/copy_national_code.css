@@ -1,0 +1,66 @@
+.national-code-copy {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.national-code-copy input {
+  direction: ltr;
+  text-align: left;
+}
+
+.national-code-copy-button {
+  align-items: center;
+  background: var(--button-bg);
+  border: 0;
+  border-radius: 4px;
+  box-sizing: border-box;
+  color: var(--button-fg);
+  cursor: pointer;
+  display: inline-flex;
+  height: 32px;
+  justify-content: center;
+  min-width: 32px;
+  padding: 0;
+  position: relative;
+}
+
+.national-code-copy-button:hover:not(:disabled),
+.national-code-copy-button:focus-visible:not(:disabled) {
+  background: var(--button-hover-bg);
+}
+
+.national-code-copy-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.national-code-copy-button svg {
+  fill: none;
+  height: 18px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 18px;
+}
+
+.national-code-copy-button__status {
+  background: var(--body-fg);
+  border-radius: 4px;
+  bottom: calc(100% + 6px);
+  color: var(--body-bg);
+  font-size: 12px;
+  opacity: 0;
+  padding: 4px 8px;
+  pointer-events: none;
+  position: absolute;
+  right: 50%;
+  transform: translateX(50%);
+  transition: opacity 0.15s ease;
+  white-space: nowrap;
+}
+
+.national-code-copy-button--copied .national-code-copy-button__status {
+  opacity: 1;
+}

@@ -11,6 +11,7 @@ from django.urls import reverse
 
 from .admin import (
     PatientAdmin,
+    PatientAdminForm,
     SMSMessageLogAdmin,
     SMSMessageLogInline,
     format_sms_response,
@@ -385,6 +386,19 @@ class KavenegarRegisterSMSTests(TestCase):
         )
         self.assertNotIn("mobile", model_admin.list_display)
         self.assertIn("mobile", model_admin.get_fields(request=Mock()))
+
+    def test_patient_admin_national_code_field_has_copy_button_assets(self):
+        form = PatientAdminForm()
+        national_code_field = form.fields["national_code"]
+        model_admin = PatientAdmin(Patient, admin.site)
+        media = str(model_admin.media)
+
+        self.assertEqual(
+            national_code_field.widget.attrs["data-copy-national-code"], "true"
+        )
+        self.assertEqual(national_code_field.widget.attrs["maxlength"], "10")
+        self.assertIn("copy_national_code.css", media)
+        self.assertIn("copy_national_code.js", media)
 
     @override_settings(KAVENEGAR_DONE_TEMPLATE="done-template")
     def test_patient_admin_marks_patients_with_successful_done_sms(self):
