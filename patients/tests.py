@@ -514,6 +514,8 @@ class KavenegarRegisterSMSTests(TestCase):
         self.assertIn("درخواست شما\nثبت شد", formatted_response)
         self.assertIn("وضعیت سرویس", formatted_response)
         self.assertIn("ارسال به مخابرات", formatted_response)
+        self.assertIn("زمان سرویس", formatted_response)
+        self.assertIn("۱۴۰۵/۰۳/۲۷ ۱۳:۰۲:۰۹", formatted_response)
         self.assertNotIn("messageid", formatted_response)
 
     def test_sms_response_preserves_unparseable_text(self):
@@ -535,6 +537,17 @@ class KavenegarRegisterSMSTests(TestCase):
         self.assertFalse(inline.has_delete_permission(request))
         self.assertFalse(model_admin.has_add_permission(request))
         self.assertFalse(model_admin.has_delete_permission(request))
+
+    def test_sms_message_log_admin_hides_raw_response_fields(self):
+        request = Mock(user=Mock())
+        model_admin = SMSMessageLogAdmin(SMSMessageLog, admin.site)
+
+        fields = model_admin.get_fields(request)
+
+        self.assertIn("formatted_response", fields)
+        self.assertIn("formatted_error", fields)
+        self.assertNotIn("response", fields)
+        self.assertNotIn("error", fields)
 
     @override_settings(KAVENEGAR_API_KEY="test-api-key")
     def test_patient_update_signal_does_not_send_register_sms(self):

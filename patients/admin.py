@@ -1,5 +1,6 @@
 import ast
 import logging
+from datetime import datetime, timezone as datetime_timezone
 
 from django.conf import settings
 from django.contrib import admin, messages
@@ -24,6 +25,20 @@ SMS_RESPONSE_LABELS = {
     "date": "زمان سرویس",
     "cost": "هزینه",
 }
+
+
+def _format_sms_response_value(key, value):
+    if key != "date":
+        return value
+
+    try:
+        timestamp = int(value)
+    except (TypeError, ValueError):
+        return value
+
+    return format_tehran_jalali(
+        datetime.fromtimestamp(timestamp, tz=datetime_timezone.utc)
+    )
 
 
 def _parse_sms_response(response):
@@ -62,10 +77,11 @@ def format_sms_response(response):
             value = item.get(key)
             if value in (None, ""):
                 continue
+            value = _format_sms_response_value(key, value)
             rows.append(
                 format_html(
-                    '<div style="display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(128,128,128,.18);">'
-                    '<strong style="color: #888;">{}</strong>'
+                    '<div style="display: grid; grid-template-columns: minmax(96px, 128px) minmax(0, 1fr); gap: 10px; padding: 9px 0; border-bottom: 1px solid rgba(128,128,128,.18);">'
+                    '<strong style="color: #8aa0b2; font-weight: 700;">{}</strong>'
                     '<span style="white-space: pre-wrap; overflow-wrap: anywhere; direction: rtl; text-align: right;">{}</span>'
                     "</div>",
                     label,
@@ -75,7 +91,7 @@ def format_sms_response(response):
 
         cards.append(
             format_html(
-                '<div style="min-width: 260px; max-width: 520px; line-height: 1.9; direction: rtl; text-align: right;">{}</div>',
+                '<div style="box-sizing: border-box; width: min(100%, 720px); padding: 10px 14px; border: 1px solid rgba(128,128,128,.24); border-radius: 8px; line-height: 1.9; direction: rtl; text-align: right;">{}</div>',
                 format_html_join("", "{}", ((row,) for row in rows)),
             )
         )
@@ -226,6 +242,7 @@ class SMSMessageLogAdmin(admin.ModelAdmin):
         "formatted_error",
         "created_at_jalali",
     )
+    fields = readonly_fields
     ordering = ("-created_at",)
 
     @admin.display(description="زمان ارسال", ordering="created_at")
