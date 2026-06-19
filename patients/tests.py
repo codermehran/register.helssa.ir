@@ -611,7 +611,9 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(
             response, f'data-counter data-target="{COMMUNITY_BASE_COUNT + 2}"'
         )
+        self.assertContains(response, "افراد ثبت‌نام‌کرده تا کنون")
         self.assertNotContains(response, "ثبت‌نام‌شده در سایت")
+        self.assertNotContains(response, "جامعه همراه طرح")
         self.assertContains(response, "چرا دکتر شبانی؟")
         self.assertContains(response, "تعرفه دولتی")
 
