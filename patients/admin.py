@@ -1,12 +1,25 @@
 import ast
 import logging
 from datetime import datetime, timezone as datetime_timezone
+from io import BytesIO
+
+from bidi.algorithm import get_display
 
 from django import forms
+from django.http import FileResponse
 from django.conf import settings
 from django.contrib import admin, messages
 from django.db.models import Exists, OuterRef
 from django.utils.html import format_html, format_html_join
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from arabic_reshaper import reshape
 
 from .datetime import format_tehran_jalali
 from .models import SMSMessageLog, Patient
@@ -14,6 +27,119 @@ from .sms import build_patient_name_token, send_done_sms
 from .sms_logs import create_sms_message_log
 
 logger = logging.getLogger(__name__)
+
+
+PDF_FONT_NAME = "DejaVuSans"
+PDF_FONT_BOLD_NAME = "DejaVuSans-Bold"
+PDF_FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+PDF_FONT_BOLD_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+
+
+def _register_pdf_fonts():
+    registered_fonts = set(pdfmetrics.getRegisteredFontNames())
+    if PDF_FONT_NAME not in registered_fonts:
+        pdfmetrics.registerFont(TTFont(PDF_FONT_NAME, PDF_FONT_PATH))
+    if PDF_FONT_BOLD_NAME not in registered_fonts:
+        pdfmetrics.registerFont(TTFont(PDF_FONT_BOLD_NAME, PDF_FONT_BOLD_PATH))
+
+
+def _rtl_text(value):
+    if value in (None, ""):
+        value = "-"
+    return get_display(reshape(str(value)))
+
+
+def build_patients_pdf(patients):
+    _register_pdf_fonts()
+    buffer = BytesIO()
+    document = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=1.2 * cm,
+        leftMargin=1.2 * cm,
+        topMargin=1.2 * cm,
+        bottomMargin=1.2 * cm,
+        title="گزارش بیماران",
+    )
+    title_style = ParagraphStyle(
+        "PersianTitle",
+        fontName=PDF_FONT_BOLD_NAME,
+        fontSize=16,
+        alignment=TA_CENTER,
+        leading=24,
+        spaceAfter=12,
+    )
+    cell_style = ParagraphStyle(
+        "PersianCell",
+        fontName=PDF_FONT_NAME,
+        fontSize=10,
+        alignment=TA_RIGHT,
+        leading=16,
+    )
+    header_style = ParagraphStyle(
+        "PersianHeader",
+        parent=cell_style,
+        fontName=PDF_FONT_BOLD_NAME,
+    )
+
+    rows = [
+        [
+            Paragraph(_rtl_text("زمان ثبت"), header_style),
+            Paragraph(_rtl_text("کد ملی"), header_style),
+            Paragraph(_rtl_text("موبایل"), header_style),
+            Paragraph(_rtl_text("نام خانوادگی"), header_style),
+            Paragraph(_rtl_text("نام"), header_style),
+            Paragraph(_rtl_text("ردیف"), header_style),
+        ]
+    ]
+    for index, patient in enumerate(patients, start=1):
+        rows.append(
+            [
+                Paragraph(
+                    _rtl_text(format_tehran_jalali(patient.created_at)), cell_style
+                ),
+                Paragraph(_rtl_text(patient.national_code), cell_style),
+                Paragraph(_rtl_text(patient.mobile), cell_style),
+                Paragraph(_rtl_text(patient.last_name), cell_style),
+                Paragraph(_rtl_text(patient.first_name), cell_style),
+                Paragraph(_rtl_text(index), cell_style),
+            ]
+        )
+
+    table = Table(
+        rows,
+        repeatRows=1,
+        colWidths=[4.2 * cm, 3.2 * cm, 3.2 * cm, 4 * cm, 4 * cm, 1.6 * cm],
+    )
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#EAF2F8")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#1F2D3D")),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#BFC9D1")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                (
+                    "ROWBACKGROUNDS",
+                    (0, 1),
+                    (-1, -1),
+                    [colors.white, colors.HexColor("#F8FAFC")],
+                ),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
+
+    story = [
+        Paragraph(_rtl_text("گزارش بیماران انتخاب‌شده"), title_style),
+        Spacer(1, 0.2 * cm),
+        table,
+    ]
+    document.build(story)
+    buffer.seek(0)
+    return buffer
 
 
 class PatientAdminForm(forms.ModelForm):
@@ -168,7 +294,7 @@ class PatientAdmin(admin.ModelAdmin):
     )
     search_fields = ("mobile", "national_code", "first_name", "last_name")
     ordering = ("-created_at",)
-    actions = ("send_done_sms_to_patients",)
+    actions = ("download_patients_pdf_report", "send_done_sms_to_patients")
     inlines = (SMSMessageLogInline,)
 
     class Media:
@@ -197,6 +323,17 @@ class PatientAdmin(admin.ModelAdmin):
     @admin.display(description="زمان ثبت", ordering="created_at")
     def created_at_jalali(self, obj):
         return format_tehran_jalali(obj.created_at)
+
+    @admin.action(description="دانلود گزارش PDF بیماران انتخاب‌شده")
+    def download_patients_pdf_report(self, request, queryset):
+        patients = list(queryset.order_by("last_name", "first_name", "id"))
+        pdf_buffer = build_patients_pdf(patients)
+        return FileResponse(
+            pdf_buffer,
+            as_attachment=True,
+            filename="selected-patients-report.pdf",
+            content_type="application/pdf",
+        )
 
     @admin.action(description="ارسال پیامک انجام شد برای بیماران انتخاب‌شده")
     def send_done_sms_to_patients(self, request, queryset):
