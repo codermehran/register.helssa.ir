@@ -1,12 +1,28 @@
 import ast
 import logging
 from datetime import datetime, timezone as datetime_timezone
+from io import BytesIO
+from pathlib import Path
+from xml.sax.saxutils import escape
+
+from bidi.algorithm import get_display
 
 from django import forms
+from django.core.exceptions import ImproperlyConfigured
+from django.http import FileResponse
 from django.conf import settings
 from django.contrib import admin, messages
 from django.db.models import Exists, OuterRef
 from django.utils.html import format_html, format_html_join
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from arabic_reshaper import reshape
 
 from .datetime import format_tehran_jalali
 from .models import SMSMessageLog, Patient
@@ -14,6 +30,138 @@ from .sms import build_patient_name_token, send_done_sms
 from .sms_logs import create_sms_message_log
 
 logger = logging.getLogger(__name__)
+
+
+PDF_FONT_NAME = "DejaVuSans"
+PDF_FONT_BOLD_NAME = "DejaVuSans-Bold"
+DEFAULT_PDF_FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+DEFAULT_PDF_FONT_BOLD_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+PDF_REPORT_MAX_PATIENTS = getattr(settings, "PATIENTS_PDF_REPORT_MAX_PATIENTS", 500)
+
+
+def _pdf_font_path(setting_name: str, default_path: str) -> str:
+    return getattr(settings, setting_name, default_path)
+
+
+def _register_pdf_fonts() -> None:
+    registered_fonts = set(pdfmetrics.getRegisteredFontNames())
+    font_paths = (
+        (PDF_FONT_NAME, _pdf_font_path("PDF_FONT_PATH", DEFAULT_PDF_FONT_PATH)),
+        (
+            PDF_FONT_BOLD_NAME,
+            _pdf_font_path("PDF_FONT_BOLD_PATH", DEFAULT_PDF_FONT_BOLD_PATH),
+        ),
+    )
+
+    for font_name, font_path in font_paths:
+        if font_name in registered_fonts:
+            continue
+        if not Path(font_path).is_file():
+            raise ImproperlyConfigured(
+                f"PDF font file for {font_name} was not found at {font_path}. "
+                f"Install the DejaVu font package or configure {font_name} "
+                "with PDF_FONT_PATH/PDF_FONT_BOLD_PATH in Django settings."
+            )
+        pdfmetrics.registerFont(TTFont(font_name, font_path))
+
+
+def _rtl_text(value) -> str:
+    if value in (None, ""):
+        value = "-"
+    return escape(get_display(reshape(str(value))))
+
+
+def build_patients_pdf(patients):
+    _register_pdf_fonts()
+    buffer = BytesIO()
+    document = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=1.2 * cm,
+        leftMargin=1.2 * cm,
+        topMargin=1.2 * cm,
+        bottomMargin=1.2 * cm,
+        title="گزارش بیماران",
+    )
+    title_style = ParagraphStyle(
+        "PersianTitle",
+        fontName=PDF_FONT_BOLD_NAME,
+        fontSize=16,
+        alignment=TA_CENTER,
+        leading=24,
+        spaceAfter=12,
+    )
+    cell_style = ParagraphStyle(
+        "PersianCell",
+        fontName=PDF_FONT_NAME,
+        fontSize=10,
+        alignment=TA_RIGHT,
+        leading=16,
+    )
+    header_style = ParagraphStyle(
+        "PersianHeader",
+        parent=cell_style,
+        fontName=PDF_FONT_BOLD_NAME,
+    )
+
+    rows = [
+        [
+            Paragraph(_rtl_text("زمان ثبت"), header_style),
+            Paragraph(_rtl_text("کد ملی"), header_style),
+            Paragraph(_rtl_text("موبایل"), header_style),
+            Paragraph(_rtl_text("نام خانوادگی"), header_style),
+            Paragraph(_rtl_text("نام"), header_style),
+            Paragraph(_rtl_text("ردیف"), header_style),
+        ]
+    ]
+    for index, patient in enumerate(patients, start=1):
+        rows.append(
+            [
+                Paragraph(
+                    _rtl_text(format_tehran_jalali(patient.created_at)), cell_style
+                ),
+                Paragraph(_rtl_text(patient.national_code), cell_style),
+                Paragraph(_rtl_text(patient.mobile), cell_style),
+                Paragraph(_rtl_text(patient.last_name), cell_style),
+                Paragraph(_rtl_text(patient.first_name), cell_style),
+                Paragraph(_rtl_text(index), cell_style),
+            ]
+        )
+
+    table = Table(
+        rows,
+        repeatRows=1,
+        colWidths=[4.2 * cm, 3.2 * cm, 3.2 * cm, 4 * cm, 4 * cm, 1.6 * cm],
+    )
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#EAF2F8")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#1F2D3D")),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#BFC9D1")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                (
+                    "ROWBACKGROUNDS",
+                    (0, 1),
+                    (-1, -1),
+                    [colors.white, colors.HexColor("#F8FAFC")],
+                ),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
+
+    story = [
+        Paragraph(_rtl_text("گزارش بیماران انتخاب‌شده"), title_style),
+        Spacer(1, 0.2 * cm),
+        table,
+    ]
+    document.build(story)
+    buffer.seek(0)
+    return buffer
 
 
 class PatientAdminForm(forms.ModelForm):
@@ -45,7 +193,7 @@ SMS_RESPONSE_LABELS = {
 }
 
 
-def _format_sms_response_value(key, value):
+def _format_sms_response_value(key, value) -> object:
     if key != "date":
         return value
 
@@ -59,7 +207,7 @@ def _format_sms_response_value(key, value):
     )
 
 
-def _parse_sms_response(response):
+def _parse_sms_response(response) -> object:
     if not response:
         return []
 
@@ -149,10 +297,10 @@ class SMSMessageLogInline(admin.TabularInline):
             obj.error,
         )
 
-    def has_add_permission(self, request, obj=None):
+    def has_add_permission(self, _request, _obj=None) -> bool:
         return False
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, _request, _obj=None) -> bool:
         return False
 
 
@@ -168,7 +316,7 @@ class PatientAdmin(admin.ModelAdmin):
     )
     search_fields = ("mobile", "national_code", "first_name", "last_name")
     ordering = ("-created_at",)
-    actions = ("send_done_sms_to_patients",)
+    actions = ("download_patients_pdf_report", "send_done_sms_to_patients")
     inlines = (SMSMessageLogInline,)
 
     class Media:
@@ -197,6 +345,39 @@ class PatientAdmin(admin.ModelAdmin):
     @admin.display(description="زمان ثبت", ordering="created_at")
     def created_at_jalali(self, obj):
         return format_tehran_jalali(obj.created_at)
+
+    @admin.action(description="دانلود گزارش PDF بیماران انتخاب‌شده")
+    def download_patients_pdf_report(self, request, queryset):
+        selected_count = queryset.count()
+        if selected_count > PDF_REPORT_MAX_PATIENTS:
+            self.message_user(
+                request,
+                f"حداکثر {PDF_REPORT_MAX_PATIENTS} بیمار را برای گزارش PDF انتخاب کنید.",
+                messages.ERROR,
+            )
+            return None
+
+        patients = list(
+            queryset.order_by("last_name", "first_name", "id").only(
+                "first_name",
+                "last_name",
+                "mobile",
+                "national_code",
+                "created_at",
+            )
+        )
+        logger.info(
+            "Admin user %s exported a patients PDF report with %s records.",
+            getattr(request.user, "pk", None),
+            selected_count,
+        )
+        pdf_buffer = build_patients_pdf(patients)
+        return FileResponse(
+            pdf_buffer,
+            as_attachment=True,
+            filename="selected-patients-report.pdf",
+            content_type="application/pdf",
+        )
 
     @admin.action(description="ارسال پیامک انجام شد برای بیماران انتخاب‌شده")
     def send_done_sms_to_patients(self, request, queryset):
@@ -285,8 +466,8 @@ class SMSMessageLogAdmin(admin.ModelAdmin):
             obj.error,
         )
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, _request) -> bool:
         return False
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, _request, _obj=None) -> bool:
         return False

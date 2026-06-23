@@ -1,3 +1,7 @@
 Django==5.2.14
 kavenegar
 mysqlclient==2.2.8
+
+reportlab==5.0.0
+arabic-reshaper==3.0.1
+python-bidi==0.6.10

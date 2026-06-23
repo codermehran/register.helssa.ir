@@ -8,10 +8,14 @@ from django.contrib.messages import get_messages
 from django.db import DatabaseError, IntegrityError
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.pdfmetrics import registerFontFamily
+from reportlab.pdfbase.pdfmetrics import Font
 
 from .admin import (
     PatientAdmin,
     PatientAdminForm,
+    build_patients_pdf,
     SMSMessageLogAdmin,
     SMSMessageLogInline,
     format_sms_response,
@@ -37,6 +41,23 @@ from .sms import (
     send_done_sms,
     send_register_sms,
 )
+
+
+def register_test_pdf_fonts():
+    registered_fonts = set(pdfmetrics.getRegisteredFontNames())
+    if "DejaVuSans" not in registered_fonts:
+        pdfmetrics.registerFont(Font("DejaVuSans", "Helvetica", "WinAnsiEncoding"))
+    if "DejaVuSans-Bold" not in registered_fonts:
+        pdfmetrics.registerFont(
+            Font("DejaVuSans-Bold", "Helvetica-Bold", "WinAnsiEncoding")
+        )
+    registerFontFamily(
+        "DejaVuSans",
+        normal="DejaVuSans",
+        bold="DejaVuSans-Bold",
+        italic="DejaVuSans",
+        boldItalic="DejaVuSans-Bold",
+    )
 
 
 class PatientModelTests(TestCase):
@@ -370,6 +391,49 @@ class KavenegarRegisterSMSTests(TestCase):
             "KAVENEGAR_DONE_TEMPLATE) پیکربندی نشده است.",
             [message.message for message in get_messages(response.wsgi_request)],
         )
+
+    def test_admin_action_downloads_pdf_report_for_selected_patients(self):
+        register_test_pdf_fonts()
+        user = get_user_model().objects.create_superuser(
+            username="admin-pdf",
+            email="admin-pdf@example.com",
+            password="password",
+        )
+        self.client.force_login(user)
+        patient = Patient.objects.create(
+            first_name="Ali",
+            last_name="Ahmadi",
+            mobile="09123456789",
+            national_code="1111111111",
+        )
+
+        response = self.client.post(
+            reverse("admin:patients_patient_changelist"),
+            {
+                "action": "download_patients_pdf_report",
+                "_selected_action": [str(patient.pk)],
+                "index": "0",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn("selected-patients-report.pdf", response["Content-Disposition"])
+        content = b"".join(response.streaming_content)
+        self.assertTrue(content.startswith(b"%PDF"))
+
+    def test_build_patients_pdf_returns_pdf_buffer(self):
+        register_test_pdf_fonts()
+        patient = Patient.objects.create(
+            first_name="علی",
+            last_name="احمدی",
+            mobile="09123456789",
+            national_code="1111111111",
+        )
+
+        pdf_buffer = build_patients_pdf([patient])
+
+        self.assertTrue(pdf_buffer.getvalue().startswith(b"%PDF"))
 
     def test_patient_admin_list_shows_national_code_instead_of_mobile(self):
         model_admin = PatientAdmin(Patient, admin.site)
