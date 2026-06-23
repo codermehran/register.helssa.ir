@@ -2,10 +2,13 @@ import ast
 import logging
 from datetime import datetime, timezone as datetime_timezone
 from io import BytesIO
+from pathlib import Path
+from xml.sax.saxutils import escape
 
 from bidi.algorithm import get_display
 
 from django import forms
+from django.core.exceptions import ImproperlyConfigured
 from django.http import FileResponse
 from django.conf import settings
 from django.contrib import admin, messages
@@ -31,22 +34,41 @@ logger = logging.getLogger(__name__)
 
 PDF_FONT_NAME = "DejaVuSans"
 PDF_FONT_BOLD_NAME = "DejaVuSans-Bold"
-PDF_FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-PDF_FONT_BOLD_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+DEFAULT_PDF_FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+DEFAULT_PDF_FONT_BOLD_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+PDF_REPORT_MAX_PATIENTS = getattr(settings, "PATIENTS_PDF_REPORT_MAX_PATIENTS", 500)
 
 
-def _register_pdf_fonts():
+def _pdf_font_path(setting_name: str, default_path: str) -> str:
+    return getattr(settings, setting_name, default_path)
+
+
+def _register_pdf_fonts() -> None:
     registered_fonts = set(pdfmetrics.getRegisteredFontNames())
-    if PDF_FONT_NAME not in registered_fonts:
-        pdfmetrics.registerFont(TTFont(PDF_FONT_NAME, PDF_FONT_PATH))
-    if PDF_FONT_BOLD_NAME not in registered_fonts:
-        pdfmetrics.registerFont(TTFont(PDF_FONT_BOLD_NAME, PDF_FONT_BOLD_PATH))
+    font_paths = (
+        (PDF_FONT_NAME, _pdf_font_path("PDF_FONT_PATH", DEFAULT_PDF_FONT_PATH)),
+        (
+            PDF_FONT_BOLD_NAME,
+            _pdf_font_path("PDF_FONT_BOLD_PATH", DEFAULT_PDF_FONT_BOLD_PATH),
+        ),
+    )
+
+    for font_name, font_path in font_paths:
+        if font_name in registered_fonts:
+            continue
+        if not Path(font_path).is_file():
+            raise ImproperlyConfigured(
+                f"PDF font file for {font_name} was not found at {font_path}. "
+                f"Install the DejaVu font package or configure {font_name} "
+                "with PDF_FONT_PATH/PDF_FONT_BOLD_PATH in Django settings."
+            )
+        pdfmetrics.registerFont(TTFont(font_name, font_path))
 
 
-def _rtl_text(value):
+def _rtl_text(value) -> str:
     if value in (None, ""):
         value = "-"
-    return get_display(reshape(str(value)))
+    return escape(get_display(reshape(str(value))))
 
 
 def build_patients_pdf(patients):
@@ -171,7 +193,7 @@ SMS_RESPONSE_LABELS = {
 }
 
 
-def _format_sms_response_value(key, value):
+def _format_sms_response_value(key, value) -> object:
     if key != "date":
         return value
 
@@ -185,7 +207,7 @@ def _format_sms_response_value(key, value):
     )
 
 
-def _parse_sms_response(response):
+def _parse_sms_response(response) -> object:
     if not response:
         return []
 
@@ -275,10 +297,10 @@ class SMSMessageLogInline(admin.TabularInline):
             obj.error,
         )
 
-    def has_add_permission(self, request, obj=None):
+    def has_add_permission(self, _request, _obj=None) -> bool:
         return False
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, _request, _obj=None) -> bool:
         return False
 
 
@@ -326,7 +348,29 @@ class PatientAdmin(admin.ModelAdmin):
 
     @admin.action(description="دانلود گزارش PDF بیماران انتخاب‌شده")
     def download_patients_pdf_report(self, request, queryset):
-        patients = list(queryset.order_by("last_name", "first_name", "id"))
+        selected_count = queryset.count()
+        if selected_count > PDF_REPORT_MAX_PATIENTS:
+            self.message_user(
+                request,
+                f"حداکثر {PDF_REPORT_MAX_PATIENTS} بیمار را برای گزارش PDF انتخاب کنید.",
+                messages.ERROR,
+            )
+            return None
+
+        patients = list(
+            queryset.order_by("last_name", "first_name", "id").only(
+                "first_name",
+                "last_name",
+                "mobile",
+                "national_code",
+                "created_at",
+            )
+        )
+        logger.info(
+            "Admin user %s exported a patients PDF report with %s records.",
+            getattr(request.user, "pk", None),
+            selected_count,
+        )
         pdf_buffer = build_patients_pdf(patients)
         return FileResponse(
             pdf_buffer,
@@ -422,8 +466,8 @@ class SMSMessageLogAdmin(admin.ModelAdmin):
             obj.error,
         )
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, _request) -> bool:
         return False
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(self, _request, _obj=None) -> bool:
         return False
