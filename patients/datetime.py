@@ -54,21 +54,36 @@ def to_persian_digits(value):
     return str(value).translate(_PERSIAN_DIGITS_TRANSLATION)
 
 
-def format_tehran_jalali(value):
-    """Format an aware/naive datetime as Jalali date and Tehran local time."""
+def _to_tehran_local(value):
+    if value is None:
+        return None
+    if timezone.is_naive(value):
+        value = timezone.make_aware(value)
+    return timezone.localtime(value)
+
+
+def format_tehran_jalali_date(value):
+    """Format an aware/naive date or datetime as a Jalali date in Tehran time."""
 
     if value is None:
         return "-"
 
-    if timezone.is_naive(value):
-        value = timezone.make_aware(value)
+    if hasattr(value, "hour"):
+        value = _to_tehran_local(value)
 
-    local_value = timezone.localtime(value)
     jalali_year, jalali_month, jalali_day = _gregorian_to_jalali(
-        local_value.year, local_value.month, local_value.day
+        value.year, value.month, value.day
     )
-    formatted = (
-        f"{jalali_year:04d}/{jalali_month:02d}/{jalali_day:02d} "
-        f"{local_value:%H:%M:%S}"
+    return to_persian_digits(f"{jalali_year:04d}/{jalali_month:02d}/{jalali_day:02d}")
+
+
+def format_tehran_jalali(value):
+    """Format an aware/naive datetime as Jalali date and Tehran local time."""
+
+    local_value = _to_tehran_local(value)
+    if local_value is None:
+        return "-"
+
+    return to_persian_digits(
+        f"{format_tehran_jalali_date(local_value)} {local_value:%H:%M:%S}"
     )
-    return to_persian_digits(formatted)
