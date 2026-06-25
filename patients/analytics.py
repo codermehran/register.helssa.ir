@@ -6,7 +6,9 @@ from collections import OrderedDict
 from django.conf import settings
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
+from django.utils import timezone
 
+from .datetime import format_tehran_jalali_date
 from .models import VisitEvent
 
 logger = logging.getLogger(__name__)
@@ -110,8 +112,8 @@ def get_visit_report_summary(queryset):
     top_paths = list(queryset.values("path").annotate(count=Count("id")).order_by("-count", "path")[:10])
     top_referrers = list(queryset.exclude(referrer="").values("referrer").annotate(count=Count("id")).order_by("-count", "referrer")[:10])
     daily = OrderedDict(
-        (row["day"].isoformat(), row["count"])
-        for row in queryset.annotate(day=TruncDate("created_at")).values("day").annotate(count=Count("id")).order_by("day")
+        (format_tehran_jalali_date(row["day"]), row["count"])
+        for row in queryset.annotate(day=TruncDate("created_at", tzinfo=timezone.get_current_timezone())).values("day").annotate(count=Count("id")).order_by("day")
         if row["day"]
     )
     return {

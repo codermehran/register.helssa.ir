@@ -1069,3 +1069,69 @@ class VisitAnalyticsTests(TestCase):
         self.assertFalse(model_admin.has_add_permission(request))
         self.assertFalse(model_admin.has_change_permission(request, VisitEvent()))
         self.assertFalse(model_admin.has_delete_permission(request, VisitEvent()))
+
+    @patch("patients.admin.timezone.now")
+    def test_visit_report_default_range_is_last_three_hours(self, mocked_now):
+        from .admin import _parse_report_range
+        from django.test import RequestFactory
+        from django.utils import timezone
+
+        mocked_now.return_value = datetime(2026, 3, 21, 8, 30, tzinfo=datetime_timezone.utc)
+        request = RequestFactory().get("/admin/patients/visitreport/")
+        request.user = Mock()
+
+        start_dt, end_dt, start_value, end_value, selected_range = _parse_report_range(request)
+
+        self.assertEqual(selected_range, "custom")
+        self.assertEqual(end_dt, mocked_now.return_value)
+        self.assertEqual(start_dt, mocked_now.return_value - timezone.timedelta(hours=3))
+        self.assertEqual(start_value, "2026-03-21T09:00")
+        self.assertEqual(end_value, "2026-03-21T12:00")
+
+    @patch("patients.admin.timezone.now")
+    def test_visit_report_today_shortcut_uses_tehran_day(self, mocked_now):
+        from .admin import _parse_report_range
+        from django.test import RequestFactory
+
+        mocked_now.return_value = datetime(2026, 3, 21, 8, 30, tzinfo=datetime_timezone.utc)
+        request = RequestFactory().get("/admin/patients/visitreport/", {"range": "today"})
+        request.user = Mock()
+
+        start_dt, end_dt, _start_value, _end_value, selected_range = _parse_report_range(request)
+
+        self.assertEqual(selected_range, "today")
+        self.assertEqual(format_tehran_jalali(start_dt), "۱۴۰۵/۰۱/۰۱ ۰۰:۰۰:۰۰")
+        self.assertEqual(end_dt, mocked_now.return_value)
+
+    def test_visit_report_summary_daily_counts_are_jalali_tehran_dates(self):
+        from .analytics import get_visit_report_summary
+        from .models import VisitEvent
+
+        event = VisitEvent.objects.create(
+            visitor_id="00000000-0000-0000-0000-000000000001",
+            event_type=VisitEvent.EVENT_FORM_VIEW,
+            method="GET",
+            path="/",
+            status_code=200,
+        )
+        VisitEvent.objects.filter(pk=event.pk).update(
+            created_at=datetime(2026, 3, 20, 20, 45, tzinfo=datetime_timezone.utc)
+        )
+
+        summary = get_visit_report_summary(VisitEvent.objects.all())
+
+        self.assertEqual(list(summary["daily_counts"].keys()), ["۱۴۰۵/۰۱/۰۱"])
+
+    def test_visit_report_template_contains_shortcuts_and_print_button(self):
+        user = get_user_model().objects.create_superuser("admin", "admin@example.com", "pass")
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("admin:patients_visitreport_changelist"))
+
+        self.assertContains(response, "امروز")
+        self.assertContains(response, "دیروز")
+        self.assertContains(response, "یک هفته قبل")
+        self.assertContains(response, "یک ماه قبل")
+        self.assertContains(response, "گزارش کل")
+        self.assertContains(response, "window.print()")
+        self.assertContains(response, "بازه گزارش:")

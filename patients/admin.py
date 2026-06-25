@@ -27,7 +27,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from arabic_reshaper import reshape
 
-from .datetime import format_tehran_jalali
+from .datetime import format_tehran_jalali, to_persian_digits
 from .analytics import get_visit_report_queryset, get_visit_report_summary
 from .models import SMSMessageLog, Patient, VisitEvent, VisitReport
 from .sms import build_patient_name_token, send_done_sms
@@ -64,18 +64,48 @@ def _shorten(value, length=42):
     return value if len(value) <= length else f"{value[: length - 1]}…"
 
 
+VISIT_REPORT_PRESETS = {"today", "yesterday", "week", "month", "all"}
+
+
+def _datetime_local_value(value):
+    return timezone.localtime(value).strftime("%Y-%m-%dT%H:%M")
+
+
+def _tehran_day_bounds(value):
+    local_value = timezone.localtime(value)
+    start = local_value.replace(hour=0, minute=0, second=0, microsecond=0)
+    end = start + timezone.timedelta(days=1)
+    return start, end
+
+
 def _parse_report_range(request):
     now = timezone.now()
-    default_start = now - timezone.timedelta(days=7)
-    start_value = request.GET.get("start_date") or default_start.strftime("%Y-%m-%dT%H:%M")
-    end_value = request.GET.get("end_date") or now.strftime("%Y-%m-%dT%H:%M")
+    preset = request.GET.get("range")
+
+    if preset in VISIT_REPORT_PRESETS:
+        today_start, _tomorrow_start = _tehran_day_bounds(now)
+        if preset == "today":
+            start_dt, end_dt = today_start, now
+        elif preset == "yesterday":
+            start_dt, end_dt = today_start - timezone.timedelta(days=1), today_start
+        elif preset == "week":
+            start_dt, end_dt = now - timezone.timedelta(days=7), now
+        elif preset == "month":
+            start_dt, end_dt = now - timezone.timedelta(days=30), now
+        else:
+            start_dt, end_dt = datetime(1970, 1, 1, tzinfo=datetime_timezone.utc), now
+        return start_dt, end_dt, _datetime_local_value(start_dt), _datetime_local_value(end_dt), preset
+
+    default_start = now - timezone.timedelta(hours=3)
+    start_value = request.GET.get("start_date") or _datetime_local_value(default_start)
+    end_value = request.GET.get("end_date") or _datetime_local_value(now)
     start_dt = parse_datetime(start_value) or datetime.fromisoformat(start_value)
     end_dt = parse_datetime(end_value) or datetime.fromisoformat(end_value)
     if timezone.is_naive(start_dt):
         start_dt = timezone.make_aware(start_dt)
     if timezone.is_naive(end_dt):
         end_dt = timezone.make_aware(end_dt)
-    return start_dt, end_dt, start_value, end_value
+    return start_dt, end_dt, start_value, end_value, "custom"
 
 
 def build_visit_events_pdf(events, summary, start_datetime, end_datetime):
@@ -593,24 +623,25 @@ class VisitReportAdmin(admin.ModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         try:
-            start_dt, end_dt, start_value, end_value = _parse_report_range(request)
+            start_dt, end_dt, start_value, end_value, selected_range = _parse_report_range(request)
         except (TypeError, ValueError):
             now = timezone.now()
-            start_dt = now - timezone.timedelta(days=7)
+            start_dt = now - timezone.timedelta(hours=3)
             end_dt = now
-            start_value = start_dt.strftime("%Y-%m-%dT%H:%M")
-            end_value = end_dt.strftime("%Y-%m-%dT%H:%M")
+            start_value = _datetime_local_value(start_dt)
+            end_value = _datetime_local_value(end_dt)
+            selected_range = "custom"
             self.message_user(request, "بازه زمانی نامعتبر بود؛ بازه پیش‌فرض نمایش داده شد.", messages.WARNING)
         queryset = get_visit_report_queryset(start_dt, end_dt)
         summary = get_visit_report_summary(queryset)
         cards = [
-            ("تعداد کل رویدادها", summary["total_events"]),
-            ("بازدیدها", summary["page_views"]),
-            ("کاربران یکتا", summary["unique_visitors"]),
-            ("مشاهده فرم", summary["form_views"]),
-            ("تلاش ثبت‌نام", summary["submit_attempts"]),
-            ("ثبت‌نام موفق", summary["successful_registrations"]),
-            ("ثبت‌نام ناموفق", summary["invalid_submits"] + summary["error_submits"]),
+            ("تعداد کل رویدادها", to_persian_digits(summary["total_events"])),
+            ("بازدیدها", to_persian_digits(summary["page_views"])),
+            ("کاربران یکتا", to_persian_digits(summary["unique_visitors"])),
+            ("مشاهده فرم", to_persian_digits(summary["form_views"])),
+            ("تلاش ثبت‌نام", to_persian_digits(summary["submit_attempts"])),
+            ("ثبت‌نام موفق", to_persian_digits(summary["successful_registrations"])),
+            ("ثبت‌نام ناموفق", to_persian_digits(summary["invalid_submits"] + summary["error_submits"])),
         ]
         context = {
             **(extra_context or {}),
@@ -620,6 +651,8 @@ class VisitReportAdmin(admin.ModelAdmin):
             "start_value": start_value,
             "end_value": end_value,
             "export_url": "export-pdf/",
+            "selected_range": selected_range,
+            "range_label": f"از {format_tehran_jalali(start_dt)} تا {format_tehran_jalali(end_dt)}",
         }
         return super().changelist_view(request, context)
 
@@ -627,7 +660,7 @@ class VisitReportAdmin(admin.ModelAdmin):
         if not self.has_view_permission(request):
             raise PermissionDenied
         try:
-            start_dt, end_dt, _start_value, _end_value = _parse_report_range(request)
+            start_dt, end_dt, _start_value, _end_value, _selected_range = _parse_report_range(request)
         except (TypeError, ValueError):
             self.message_user(request, "بازه زمانی گزارش نامعتبر است.", messages.ERROR)
             return self.changelist_view(request)

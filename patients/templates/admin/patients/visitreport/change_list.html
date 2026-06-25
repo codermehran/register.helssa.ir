@@ -1,19 +1,41 @@
 {% extends "admin/base_site.html" %}
 {% block content %}
 <div dir="rtl" style="text-align:right">
+  <style>
+    .visit-report-toolbar { margin: 1rem 0; display:flex; gap:.75rem; align-items:end; flex-wrap:wrap; }
+    .visit-report-presets { display:flex; gap:.5rem; flex-wrap:wrap; margin: 1rem 0; }
+    .visit-report-presets .button.active { background:#0c4a6e; color:#fff; }
+    .visit-report-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin:16px 0; }
+    .visit-report-card { border:1px solid #ddd; border-radius:8px; padding:12px; background:#fff; }
+    .visit-report-card div { font-size:22px; margin-top:.35rem; }
+    @media print {
+      #header, #nav-sidebar, .breadcrumbs, .object-tools, .visit-report-no-print { display:none !important; }
+      #content { margin:0 !important; padding:0 !important; }
+      .visit-report-card { break-inside: avoid; }
+    }
+  </style>
   <h1>گزارش بازدید سایت</h1>
-  <form method="get" style="margin: 1rem 0; display:flex; gap:1rem; align-items:end; flex-wrap:wrap;">
+  <p><strong>بازه گزارش:</strong> {{ range_label }}</p>
+  <div class="visit-report-presets visit-report-no-print" aria-label="بازه‌های سریع گزارش">
+    <a class="button{% if selected_range == 'today' %} active{% endif %}" href="?range=today">امروز</a>
+    <a class="button{% if selected_range == 'yesterday' %} active{% endif %}" href="?range=yesterday">دیروز</a>
+    <a class="button{% if selected_range == 'week' %} active{% endif %}" href="?range=week">یک هفته قبل</a>
+    <a class="button{% if selected_range == 'month' %} active{% endif %}" href="?range=month">یک ماه قبل</a>
+    <a class="button{% if selected_range == 'all' %} active{% endif %}" href="?range=all">گزارش کل</a>
+  </div>
+  <form method="get" class="visit-report-toolbar visit-report-no-print">
     <label>از تاریخ/زمان <input type="datetime-local" name="start_date" value="{{ start_value }}"></label>
     <label>تا تاریخ/زمان <input type="datetime-local" name="end_date" value="{{ end_value }}"></label>
     <button type="submit" class="button">نمایش خلاصه</button>
     <a class="button" href="{{ export_url }}?start_date={{ start_value|urlencode }}&end_date={{ end_value|urlencode }}">دانلود گزارش PDF جزئیات</a>
+    <button type="button" class="button" onclick="window.print()">پرینت گزارش</button>
   </form>
-  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin:16px 0;">
-    {% for label,value in cards %}<div style="border:1px solid #ddd; border-radius:8px; padding:12px;"><strong>{{ label }}</strong><div style="font-size:22px">{{ value }}</div></div>{% endfor %}
+  <div class="visit-report-cards">
+    {% for label,value in cards %}<div class="visit-report-card"><strong>{{ label }}</strong><div>{{ value }}</div></div>{% endfor %}
   </div>
   <h2>مسیرهای پربازدید</h2><ul>{% for item in summary.top_paths %}<li>{{ item.path }}: {{ item.count }}</li>{% empty %}<li>داده‌ای وجود ندارد.</li>{% endfor %}</ul>
   <h2>ارجاع‌دهنده‌های پرتکرار</h2><ul>{% for item in summary.top_referrers %}<li>{{ item.referrer }}: {{ item.count }}</li>{% empty %}<li>داده‌ای وجود ندارد.</li>{% endfor %}</ul>
   <h2>شمارش روزانه</h2><ul>{% for day,count in summary.daily_counts.items %}<li>{{ day }}: {{ count }}</li>{% empty %}<li>داده‌ای وجود ندارد.</li>{% endfor %}</ul>
-  <p><em>جزئیات خام رویدادها در این صفحه نمایش داده نمی‌شود و فقط در PDF قابل دریافت است.</em></p>
+  <p class="visit-report-no-print"><em>جزئیات خام رویدادها در این صفحه نمایش داده نمی‌شود و فقط در PDF قابل دریافت است.</em></p>
 </div>
 {% endblock %}
