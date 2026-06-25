@@ -40,6 +40,20 @@ PDF_FONT_NAME = "DejaVuSans"
 PDF_FONT_BOLD_NAME = "DejaVuSans-Bold"
 DEFAULT_PDF_FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 DEFAULT_PDF_FONT_BOLD_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+PDF_FONT_PATH_CANDIDATES = (
+    DEFAULT_PDF_FONT_PATH,
+    "/usr/local/share/fonts/dejavu/DejaVuSans.ttf",
+    "C:/Windows/Fonts/DejaVuSans.ttf",
+    "C:/Windows/Fonts/tahoma.ttf",
+    "C:/Windows/Fonts/arial.ttf",
+)
+PDF_FONT_BOLD_PATH_CANDIDATES = (
+    DEFAULT_PDF_FONT_BOLD_PATH,
+    "/usr/local/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+    "C:/Windows/Fonts/DejaVuSans-Bold.ttf",
+    "C:/Windows/Fonts/tahomabd.ttf",
+    "C:/Windows/Fonts/arialbd.ttf",
+)
 PDF_REPORT_MAX_PATIENTS = getattr(settings, "PATIENTS_PDF_REPORT_MAX_PATIENTS", 500)
 
 VISIT_REPORT_PDF_MAX_EVENTS = getattr(settings, "VISIT_REPORT_PDF_MAX_EVENTS", 1000)
@@ -107,29 +121,45 @@ def build_visit_events_pdf(events, summary, start_datetime, end_datetime):
     return buffer
 
 
-def _pdf_font_path(setting_name: str, default_path: str) -> str:
-    return getattr(settings, setting_name, default_path)
+def _pdf_font_path(setting_name: str, candidate_paths: tuple[str, ...]) -> str:
+    configured_path = getattr(settings, setting_name, None)
+    if configured_path:
+        if Path(configured_path).is_file():
+            return str(configured_path)
+        raise ImproperlyConfigured(
+            f"PDF font file configured by {setting_name} was not found at {configured_path}."
+        )
+
+    base_dir = Path(getattr(settings, "BASE_DIR", Path.cwd()))
+    project_font_paths = (
+        base_dir / "statics" / "fonts" / Path(candidate_paths[0]).name,
+        base_dir / "static" / "fonts" / Path(candidate_paths[0]).name,
+    )
+    searched_paths = (*project_font_paths, *candidate_paths)
+    for font_path in searched_paths:
+        if Path(font_path).is_file():
+            return str(font_path)
+
+    raise ImproperlyConfigured(
+        f"PDF font file for {setting_name} was not found. "
+        f"Configure {setting_name} in Django settings or install a supported Persian font. "
+        f"Searched: {', '.join(str(path) for path in searched_paths)}"
+    )
 
 
 def _register_pdf_fonts() -> None:
     registered_fonts = set(pdfmetrics.getRegisteredFontNames())
     font_paths = (
-        (PDF_FONT_NAME, _pdf_font_path("PDF_FONT_PATH", DEFAULT_PDF_FONT_PATH)),
+        (PDF_FONT_NAME, _pdf_font_path("PDF_FONT_PATH", PDF_FONT_PATH_CANDIDATES)),
         (
             PDF_FONT_BOLD_NAME,
-            _pdf_font_path("PDF_FONT_BOLD_PATH", DEFAULT_PDF_FONT_BOLD_PATH),
+            _pdf_font_path("PDF_FONT_BOLD_PATH", PDF_FONT_BOLD_PATH_CANDIDATES),
         ),
     )
 
     for font_name, font_path in font_paths:
         if font_name in registered_fonts:
             continue
-        if not Path(font_path).is_file():
-            raise ImproperlyConfigured(
-                f"PDF font file for {font_name} was not found at {font_path}. "
-                f"Install the DejaVu font package or configure {font_name} "
-                "with PDF_FONT_PATH/PDF_FONT_BOLD_PATH in Django settings."
-            )
         pdfmetrics.registerFont(TTFont(font_name, font_path))
 
 
