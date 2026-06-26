@@ -2,41 +2,34 @@
 {% block content %}
 <div dir="rtl" style="text-align:right">
   <style>
-    .visit-report-toolbar { margin: 1rem 0; display:flex; gap:.75rem; align-items:end; flex-wrap:wrap; }
-    .visit-report-presets { display:flex; gap:.5rem; flex-wrap:wrap; margin: 1rem 0; }
-    .visit-report-presets .button.active { background:#0c4a6e; color:#fff; }
-    .visit-report-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin:16px 0; }
-    .visit-report-card { border:1px solid #ddd; border-radius:8px; padding:12px; background:#fff; }
-    .visit-report-card div { font-size:22px; margin-top:.35rem; }
-    @media print {
-      #header, #nav-sidebar, .breadcrumbs, .object-tools, .visit-report-no-print { display:none !important; }
-      #content { margin:0 !important; padding:0 !important; }
-      .visit-report-card { break-inside: avoid; }
-    }
+    .visit-report-toolbar,.visit-report-presets{display:flex;gap:.75rem;align-items:end;flex-wrap:wrap;margin:1rem 0}.visit-report-presets .button.active{background:#0c4a6e;color:#fff}.visit-report-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:16px 0}.visit-report-card{border:1px solid #ddd;border-radius:12px;padding:14px;background:#fff;box-shadow:0 1px 3px rgba(15,23,42,.06)}.visit-report-card div{font-size:22px;margin-top:.35rem}.report-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}.report-panel{border:1px solid #e5e7eb;border-radius:12px;background:#fff;padding:12px;margin:12px 0}.table-wrap{overflow-x:auto}.visit-table{width:100%;border-collapse:collapse;min-width:900px}.visit-table th,.visit-table td{border-bottom:1px solid #e5e7eb;padding:8px;vertical-align:top}.muted{color:#64748b}@media print{#header,#nav-sidebar,.breadcrumbs,.object-tools,.visit-report-no-print{display:none!important}#content{margin:0!important;padding:0!important}.visit-report-card,.report-panel{break-inside:avoid}}
   </style>
   <h1>گزارش بازدید سایت</h1>
   <p><strong>بازه گزارش:</strong> {{ range_label }}</p>
   <div class="visit-report-presets visit-report-no-print" aria-label="بازه‌های سریع گزارش">
-    <a class="button{% if selected_range == 'today' %} active{% endif %}" href="?range=today">امروز</a>
-    <a class="button{% if selected_range == 'yesterday' %} active{% endif %}" href="?range=yesterday">دیروز</a>
-    <a class="button{% if selected_range == 'week' %} active{% endif %}" href="?range=week">یک هفته قبل</a>
-    <a class="button{% if selected_range == 'month' %} active{% endif %}" href="?range=month">یک ماه قبل</a>
-    <a class="button{% if selected_range == 'all' %} active{% endif %}" href="?range=all">گزارش کل</a>
+    <a class="button{% if selected_range == 'today' %} active{% endif %}" href="?range=today">امروز</a><a class="button{% if selected_range == 'yesterday' %} active{% endif %}" href="?range=yesterday">دیروز</a><a class="button{% if selected_range == 'week' %} active{% endif %}" href="?range=week">یک هفته قبل</a><a class="button{% if selected_range == 'month' %} active{% endif %}" href="?range=month">یک ماه قبل</a><a class="button{% if selected_range == 'all' %} active{% endif %}" href="?range=all">گزارش کل</a>
   </div>
   <form method="get" class="visit-report-toolbar visit-report-no-print">
     <label>از تاریخ/زمان <input type="text" name="start_date" value="{{ start_value }}" placeholder="۱۴۰۵/۰۴/۰۵ ۰۹:۰۰" dir="ltr" inputmode="numeric"></label>
     <label>تا تاریخ/زمان <input type="text" name="end_date" value="{{ end_value }}" placeholder="۱۴۰۵/۰۴/۰۵ ۰۹:۰۰" dir="ltr" inputmode="numeric"></label>
-    <span style="align-self:center;color:#666;">فرمت نمونه: ۱۴۰۵/۰۴/۰۵ ۰۹:۰۰</span>
-    <button type="submit" class="button">نمایش خلاصه</button>
+    <label>نوع رویداد <select name="event_type"><option value="">همه</option>{% for value,label in event_type_choices %}<option value="{{ value }}"{% if filters.event_type == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label>مسیر <input name="path" value="{{ filters.path }}" dir="ltr"></label><label>دستگاه <input name="device_type" value="{{ filters.device_type }}" dir="ltr"></label><label>utm_source <input name="utm_source" value="{{ filters.utm_source }}" dir="ltr"></label><label>utm_campaign <input name="utm_campaign" value="{{ filters.utm_campaign }}" dir="ltr"></label><label>ip_hash <input name="ip_hash" value="{{ filters.ip_hash }}" dir="ltr"></label><label>ربات <select name="is_bot"><option value="">همه</option><option value="true"{% if filters.is_bot == 'true' %} selected{% endif %}>بله</option><option value="false"{% if filters.is_bot == 'false' %} selected{% endif %}>خیر</option></select></label>
+    <span class="muted">فرمت نمونه: ۱۴۰۵/۰۴/۰۵ ۰۹:۰۰</span><button type="submit" class="button">نمایش خلاصه</button>
     <a class="button" href="{{ export_url }}{% if export_query_string %}?{{ export_query_string }}{% else %}?start_date={{ start_value|urlencode }}&end_date={{ end_value|urlencode }}{% endif %}">دانلود گزارش PDF جزئیات</a>
+    <a class="button" href="{{ csv_export_url }}{% if export_query_string %}?{{ export_query_string }}{% else %}?start_date={{ start_value|urlencode }}&end_date={{ end_value|urlencode }}{% endif %}">دانلود CSV</a>
     <button type="button" class="button" onclick="window.print()">پرینت گزارش</button>
   </form>
-  <div class="visit-report-cards">
-    {% for label,value in cards %}<div class="visit-report-card"><strong>{{ label }}</strong><div>{{ value }}</div></div>{% endfor %}
+  <div class="visit-report-cards">{% for label,value in cards %}<div class="visit-report-card"><strong>{{ label }}</strong><div>{{ value }}</div></div>{% endfor %}</div>
+  <div class="report-panel"><h2>آخرین رویدادها</h2><div class="table-wrap"><table class="visit-table"><thead><tr><th>زمان</th><th>نوع رویداد</th><th>مسیر</th><th>IP ماسک‌شده</th>{% if show_raw_ip %}<th>IP کامل</th>{% endif %}<th>هش IP</th><th>دستگاه</th><th>مرورگر</th><th>سیستم‌عامل</th><th>referrer</th><th>utm_source</th><th>utm_campaign</th><th>status_code</th></tr></thead><tbody>{% for event in summary.recent_events %}<tr><td>{{ event.created_at }}</td><td>{{ event.get_event_type_display }}</td><td dir="ltr">{{ event.path }}</td><td dir="ltr">{{ event.masked_ip|default:"-" }}</td>{% if show_raw_ip %}<td dir="ltr">{{ event.ip_address|default:"-" }}</td>{% endif %}<td dir="ltr">{{ event.ip_hash|slice:":12" }}</td><td>{{ event.device_type }}</td><td>{{ event.browser }}</td><td>{{ event.os }}</td><td dir="ltr">{{ event.referrer|default:"-" }}</td><td>{{ event.utm_source }}</td><td>{{ event.utm_campaign }}</td><td>{{ event.status_code|default:"-" }}</td></tr>{% empty %}<tr><td colspan="13">داده‌ای وجود ندارد.</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="report-grid">
+    <div class="report-panel"><h2>مسیرهای پربازدید</h2><ul>{% for item in summary.top_paths %}<li>{{ item.path }}: {{ item.count }}</li>{% empty %}<li>داده‌ای وجود ندارد.</li>{% endfor %}</ul></div>
+    <div class="report-panel"><h2>referrerهای پرتکرار</h2><ul>{% for item in summary.top_referrers %}<li>{{ item.referrer }}: {{ item.count }}</li>{% empty %}<li>داده‌ای وجود ندارد.</li>{% endfor %}</ul></div>
+    <div class="report-panel"><h2>کمپین‌های پرتکرار</h2><ul>{% for item in summary.top_utm_campaigns %}<li>{{ item.utm_campaign }}: {{ item.count }}</li>{% empty %}<li>داده‌ای وجود ندارد.</li>{% endfor %}</ul></div>
+    <div class="report-panel"><h2>دستگاه‌ها</h2><ul>{% for item in summary.top_devices %}<li>{{ item.device_type }}: {{ item.count }}</li>{% empty %}<li>داده‌ای وجود ندارد.</li>{% endfor %}</ul></div>
+    <div class="report-panel"><h2>مرورگرها</h2><ul>{% for item in summary.top_browsers %}<li>{{ item.browser }}: {{ item.count }}</li>{% empty %}<li>داده‌ای وجود ندارد.</li>{% endfor %}</ul></div>
+    <div class="report-panel"><h2>سیستم‌عامل‌ها</h2><ul>{% for item in summary.top_os %}<li>{{ item.os }}: {{ item.count }}</li>{% empty %}<li>داده‌ای وجود ندارد.</li>{% endfor %}</ul></div>
+    <div class="report-panel"><h2>شمارش روزانه</h2><ul>{% for day,count in summary.daily_counts.items %}<li>{{ day }}: {{ count }}</li>{% empty %}<li>داده‌ای وجود ندارد.</li>{% endfor %}</ul></div>
+    <div class="report-panel"><h2>شمارش ساعتی</h2><ul>{% for hour,count in summary.hourly_counts.items %}<li>{{ hour }}: {{ count }}</li>{% empty %}<li>داده‌ای وجود ندارد.</li>{% endfor %}</ul></div>
   </div>
-  <h2>مسیرهای پربازدید</h2><ul>{% for item in summary.top_paths %}<li>{{ item.path }}: {{ item.count }}</li>{% empty %}<li>داده‌ای وجود ندارد.</li>{% endfor %}</ul>
-  <h2>ارجاع‌دهنده‌های پرتکرار</h2><ul>{% for item in summary.top_referrers %}<li>{{ item.referrer }}: {{ item.count }}</li>{% empty %}<li>داده‌ای وجود ندارد.</li>{% endfor %}</ul>
-  <h2>شمارش روزانه</h2><ul>{% for day,count in summary.daily_counts.items %}<li>{{ day }}: {{ count }}</li>{% empty %}<li>داده‌ای وجود ندارد.</li>{% endfor %}</ul>
-  <p class="visit-report-no-print"><em>جزئیات خام رویدادها در این صفحه نمایش داده نمی‌شود و فقط در PDF قابل دریافت است.</em></p>
 </div>
 {% endblock %}
