@@ -1240,6 +1240,28 @@ class VisitAnalyticsTests(TestCase):
 
         self.assertEqual(list(summary["daily_counts"].keys()), ["۱۴۰۵/۰۱/۰۱"])
 
+    def test_visit_report_recent_events_have_jalali_tehran_datetime(self):
+        from .analytics import get_visit_report_summary
+        from .models import VisitEvent
+
+        event = VisitEvent.objects.create(
+            visitor_id="00000000-0000-0000-0000-000000000001",
+            event_type=VisitEvent.EVENT_PAGE_VIEW,
+            method="GET",
+            path="/",
+            status_code=200,
+        )
+        VisitEvent.objects.filter(pk=event.pk).update(
+            created_at=datetime(2026, 6, 26, 8, 48, 10, tzinfo=datetime_timezone.utc)
+        )
+
+        summary = get_visit_report_summary(VisitEvent.objects.all())
+
+        self.assertEqual(
+            summary["recent_events"][0].created_at_jalali,
+            "۱۴۰۵/۰۴/۰۵ ۱۲:۱۸:۱۰",
+        )
+
     def test_visit_report_template_contains_shortcuts_and_print_button(self):
         user = get_user_model().objects.create_superuser(
             "admin", "admin@example.com", "pass"
