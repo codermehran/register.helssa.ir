@@ -9,7 +9,7 @@ from django.db.models import Count, Q
 from django.db.models.functions import ExtractHour, TruncDate
 from django.utils import timezone
 
-from .datetime import format_tehran_jalali_date
+from .datetime import format_tehran_jalali, format_tehran_jalali_date
 from .models import VisitEvent
 
 logger = logging.getLogger(__name__)
@@ -169,6 +169,13 @@ def _top(queryset, field):
     return list(queryset.exclude(**{field: ""}).values(field).annotate(count=Count("id")).order_by("-count", field)[:10])
 
 
+def _format_recent_events(queryset):
+    events = list(queryset.order_by("-created_at")[:100])
+    for event in events:
+        event.created_at_jalali = format_tehran_jalali(event.created_at)
+    return events
+
+
 def get_visit_report_summary(queryset):
     metrics = queryset.aggregate(
         total_events=Count("id"),
@@ -202,5 +209,5 @@ def get_visit_report_summary(queryset):
         "top_utm_campaigns": _top(queryset, "utm_campaign"),
         "daily_counts": daily,
         "hourly_counts": hourly,
-        "recent_events": list(queryset.order_by("-created_at")[:100]),
+        "recent_events": _format_recent_events(queryset),
     }
