@@ -1,11 +1,12 @@
 import hashlib
+import ipaddress
 import logging
 import uuid
 from collections import OrderedDict
 
 from django.conf import settings
 from django.db.models import Count, Q
-from django.db.models.functions import TruncDate
+from django.db.models.functions import ExtractHour, TruncDate
 from django.utils import timezone
 
 from .datetime import format_tehran_jalali_date
@@ -28,6 +29,66 @@ def hash_ip(ip):
     return hashlib.sha256(f"{salt}:{ip}".encode("utf-8")).hexdigest()
 
 
+def mask_ip(ip):
+    if not ip:
+        return ""
+    try:
+        parsed = ipaddress.ip_address(ip)
+    except ValueError:
+        return ""
+    if parsed.version == 4:
+        parts = ip.split(".")
+        return ".".join(parts[:3] + ["xxx"]) if getattr(settings, "ANALYTICS_MASK_IPV4_LAST_OCTET", True) else ip
+    if not getattr(settings, "ANALYTICS_MASK_IPV6", True):
+        return ip
+    hextets = parsed.exploded.split(":")
+    return ":".join(hextets[:4] + ["xxxx", "xxxx", "xxxx", "xxxx"])
+
+
+def extract_utm_params(request):
+    return {key: request.GET.get(key, "")[:120] for key in ("utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term")}
+
+
+def parse_user_agent(user_agent):
+    ua = (user_agent or "").lower()
+    is_bot = any(token in ua for token in ("bot", "crawler", "spider", "slurp", "bingpreview"))
+    if is_bot:
+        device_type = "bot"
+    elif "ipad" in ua or "tablet" in ua:
+        device_type = "tablet"
+    elif "mobi" in ua or "iphone" in ua or "android" in ua:
+        device_type = "mobile"
+    elif ua:
+        device_type = "desktop"
+    else:
+        device_type = "unknown"
+    if "edg/" in ua:
+        browser = "Edge"
+    elif "chrome/" in ua and "chromium" not in ua:
+        browser = "Chrome"
+    elif "firefox/" in ua:
+        browser = "Firefox"
+    elif "safari/" in ua and "chrome/" not in ua:
+        browser = "Safari"
+    elif is_bot:
+        browser = "Bot"
+    else:
+        browser = "Unknown"
+    if "windows" in ua:
+        os_name = "Windows"
+    elif "android" in ua:
+        os_name = "Android"
+    elif "iphone" in ua or "ipad" in ua or "ios" in ua:
+        os_name = "iOS"
+    elif "mac os" in ua or "macintosh" in ua:
+        os_name = "macOS"
+    elif "linux" in ua:
+        os_name = "Linux"
+    else:
+        os_name = "Unknown"
+    return {"device_type": device_type, "browser": browser[:80], "os": os_name[:80], "is_bot": is_bot}
+
+
 def _valid_uuid(value):
     try:
         return str(uuid.UUID(str(value)))
@@ -42,16 +103,8 @@ def get_or_create_visitor_id(request, response=None):
         visitor_id = str(uuid.uuid4())
         request.COOKIES[cookie_name] = visitor_id
         setattr(request, "_analytics_visitor_cookie_needs_update", True)
-
     if response is not None and getattr(request, "_analytics_visitor_cookie_needs_update", False):
-        response.set_cookie(
-            cookie_name,
-            visitor_id,
-            max_age=getattr(settings, "ANALYTICS_VISITOR_COOKIE_MAX_AGE", 60 * 60 * 24 * 365),
-            httponly=True,
-            samesite="Lax",
-            secure=getattr(settings, "SESSION_COOKIE_SECURE", False),
-        )
+        response.set_cookie(cookie_name, visitor_id, max_age=getattr(settings, "ANALYTICS_VISITOR_COOKIE_MAX_AGE", 60 * 60 * 24 * 365), httponly=True, samesite="Lax", secure=getattr(settings, "SESSION_COOKIE_SECURE", False))
         setattr(request, "_analytics_visitor_cookie_needs_update", False)
     return visitor_id
 
@@ -59,7 +112,7 @@ def get_or_create_visitor_id(request, response=None):
 def _safe_metadata(metadata):
     if not isinstance(metadata, dict):
         return {}
-    blocked = {"mobile", "national_code", "first_name", "last_name", "phone", "raw", "data"}
+    blocked = {"mobile", "national_code", "first_name", "last_name", "phone", "raw", "data", "form", "post"}
     return {str(k): v for k, v in metadata.items() if str(k) not in blocked}
 
 
@@ -69,33 +122,51 @@ def log_visit_event(request, event_type, response=None, patient=None, metadata=N
     try:
         visitor_id = get_or_create_visitor_id(request, response=response)
         session = getattr(request, "session", None)
-        session_key = getattr(session, "session_key", "") or ""
         ip = get_client_ip(request)
-        raw_ip = ip if getattr(settings, "ANALYTICS_STORE_RAW_IP", False) else ""
-        event_metadata = _safe_metadata(metadata)
-        if raw_ip:
-            event_metadata["raw_ip"] = raw_ip
+        user_agent = request.META.get("HTTP_USER_AGENT", "")
+        ua_info = parse_user_agent(user_agent)
+        raw_enabled = getattr(settings, "ANALYTICS_STORE_RAW_IP", False)
         return VisitEvent.objects.create(
             visitor_id=visitor_id,
-            session_key=session_key,
+            session_key=getattr(session, "session_key", "") or "",
             event_type=event_type,
             method=request.method[:10],
             path=request.path[:255],
             query_string=request.META.get("QUERY_STRING", ""),
             referrer=request.META.get("HTTP_REFERER", ""),
-            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            user_agent=user_agent,
             ip_hash=hash_ip(ip),
+            masked_ip=mask_ip(ip),
+            ip_address=ip if raw_enabled and ip else None,
             status_code=status_code if status_code is not None else getattr(response, "status_code", None),
             patient=patient,
-            metadata=event_metadata,
+            metadata=_safe_metadata(metadata),
+            **ua_info,
+            **extract_utm_params(request),
         )
     except Exception:
         logger.exception("Failed to log visit event %s.", event_type)
         return None
 
 
-def get_visit_report_queryset(start_datetime, end_datetime):
-    return VisitEvent.objects.filter(created_at__gte=start_datetime, created_at__lte=end_datetime)
+def get_visit_report_queryset(start_datetime, end_datetime, filters=None):
+    qs = VisitEvent.objects.filter(created_at__gte=start_datetime, created_at__lte=end_datetime)
+    filters = filters or {}
+    for field in ("event_type", "path", "device_type", "utm_source", "utm_campaign", "ip_hash"):
+        value = filters.get(field)
+        if value:
+            qs = qs.filter(**{field: value})
+    if filters.get("is_bot") in {"true", "false"}:
+        qs = qs.filter(is_bot=filters["is_bot"] == "true")
+    return qs
+
+
+def _percent(part, whole):
+    return round((part / whole) * 100, 1) if whole else 0
+
+
+def _top(queryset, field):
+    return list(queryset.exclude(**{field: ""}).values(field).annotate(count=Count("id")).order_by("-count", field)[:10])
 
 
 def get_visit_report_summary(queryset):
@@ -108,24 +179,28 @@ def get_visit_report_summary(queryset):
         successful_registrations=Count("id", filter=Q(event_type=VisitEvent.EVENT_FORM_SUBMIT_SUCCESS)),
         invalid_submits=Count("id", filter=Q(event_type=VisitEvent.EVENT_FORM_SUBMIT_INVALID)),
         error_submits=Count("id", filter=Q(event_type=VisitEvent.EVENT_FORM_SUBMIT_ERROR)),
+        bot_count=Count("id", filter=Q(is_bot=True)),
+        mobile_count=Count("id", filter=Q(device_type="mobile")),
+        desktop_count=Count("id", filter=Q(device_type="desktop")),
+        tablet_count=Count("id", filter=Q(device_type="tablet")),
     )
-    top_paths = list(queryset.values("path").annotate(count=Count("id")).order_by("-count", "path")[:10])
-    top_referrers = list(queryset.exclude(referrer="").values("referrer").annotate(count=Count("id")).order_by("-count", "referrer")[:10])
-    daily = OrderedDict(
-        (format_tehran_jalali_date(row["day"]), row["count"])
-        for row in queryset.annotate(day=TruncDate("created_at", tzinfo=timezone.get_current_timezone())).values("day").annotate(count=Count("id")).order_by("day")
-        if row["day"]
-    )
-    return {
-        "total_events": metrics["total_events"],
-        "page_views": metrics["page_views"],
-        "unique_visitors": metrics["unique_visitors"],
-        "form_views": metrics["form_views"],
-        "submit_attempts": metrics["submit_attempts"],
-        "successful_registrations": metrics["successful_registrations"],
-        "invalid_submits": metrics["invalid_submits"],
-        "error_submits": metrics["error_submits"],
-        "top_paths": top_paths,
-        "top_referrers": top_referrers,
+    daily = OrderedDict((format_tehran_jalali_date(row["day"]), row["count"]) for row in queryset.annotate(day=TruncDate("created_at", tzinfo=timezone.get_current_timezone())).values("day").annotate(count=Count("id")).order_by("day") if row["day"])
+    hourly = OrderedDict((f"{hour:02d}:00", 0) for hour in range(24))
+    for row in queryset.annotate(hour=ExtractHour("created_at", tzinfo=timezone.get_current_timezone())).values("hour").annotate(count=Count("id")).order_by("hour"):
+        if row["hour"] is not None:
+            hourly[f"{row['hour']:02d}:00"] = row["count"]
+    return {**metrics,
+        "conversion_rate": _percent(metrics["successful_registrations"], metrics["form_views"]),
+        "submit_success_rate": _percent(metrics["successful_registrations"], metrics["submit_attempts"]),
+        "invalid_rate": _percent(metrics["invalid_submits"], metrics["submit_attempts"]),
+        "top_paths": list(queryset.values("path").annotate(count=Count("id")).order_by("-count", "path")[:10]),
+        "top_referrers": _top(queryset, "referrer"),
+        "top_devices": _top(queryset, "device_type"),
+        "top_browsers": _top(queryset, "browser"),
+        "top_os": _top(queryset, "os"),
+        "top_utm_sources": _top(queryset, "utm_source"),
+        "top_utm_campaigns": _top(queryset, "utm_campaign"),
         "daily_counts": daily,
+        "hourly_counts": hourly,
+        "recent_events": list(queryset.order_by("-created_at")[:100]),
     }

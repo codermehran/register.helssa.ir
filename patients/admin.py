@@ -1,4 +1,5 @@
 import ast
+import csv
 import logging
 from datetime import datetime, timezone as datetime_timezone
 from io import BytesIO
@@ -9,7 +10,7 @@ from bidi.algorithm import get_display
 
 from django import forms
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponse
 from django.template.response import TemplateResponse
 from django.conf import settings
 from django.contrib import admin, messages
@@ -70,6 +71,14 @@ def _shorten(value, length=42):
 
 
 VISIT_REPORT_PRESETS = {"today", "yesterday", "week", "month", "all"}
+
+VISIT_REPORT_FILTER_FIELDS = ("event_type", "path", "device_type", "utm_source", "utm_campaign", "ip_hash", "is_bot")
+
+def _report_filters(request):
+    return {field: request.GET.get(field, "").strip() for field in VISIT_REPORT_FILTER_FIELDS if request.GET.get(field, "").strip()}
+
+def _can_show_raw_ip(request):
+    return bool(getattr(request.user, "is_superuser", False) and getattr(settings, "ANALYTICS_SHOW_RAW_IP_TO_SUPERUSER", False))
 
 
 def _datetime_local_value(value):
@@ -747,6 +756,11 @@ class VisitReportAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.export_pdf),
                 name="patients_visitreport_export_pdf",
             ),
+            path(
+                "export-csv/",
+                self.admin_site.admin_view(self.export_csv),
+                name="patients_visitreport_export_csv",
+            ),
         ]
         return custom_urls + urls
 
@@ -767,7 +781,8 @@ class VisitReportAdmin(admin.ModelAdmin):
                 "بازه زمانی نامعتبر بود؛ بازه پیش‌فرض نمایش داده شد.",
                 messages.WARNING,
             )
-        queryset = get_visit_report_queryset(start_dt, end_dt)
+        filters = _report_filters(request)
+        queryset = get_visit_report_queryset(start_dt, end_dt, filters)
         summary = get_visit_report_summary(queryset)
         cards = [
             ("تعداد کل رویدادها", to_persian_digits(summary["total_events"])),
@@ -782,6 +797,11 @@ class VisitReportAdmin(admin.ModelAdmin):
                     summary["invalid_submits"] + summary["error_submits"]
                 ),
             ),
+            ("نرخ تبدیل", f"{to_persian_digits(summary['conversion_rate'])}٪"),
+            ("نرخ موفقیت ثبت‌نام", f"{to_persian_digits(summary['submit_success_rate'])}٪"),
+            ("موبایل", to_persian_digits(summary["mobile_count"])),
+            ("دسکتاپ", to_persian_digits(summary["desktop_count"])),
+            ("ربات‌ها", to_persian_digits(summary["bot_count"])),
         ]
         context = {
             **(extra_context or {}),
@@ -791,6 +811,10 @@ class VisitReportAdmin(admin.ModelAdmin):
             "start_value": start_value,
             "end_value": end_value,
             "export_url": "export-pdf/",
+            "csv_export_url": "export-csv/",
+            "filters": filters,
+            "event_type_choices": VisitEvent.EVENT_TYPE_CHOICES,
+            "show_raw_ip": _can_show_raw_ip(request),
             "selected_range": selected_range,
             "range_label": f"از {format_tehran_jalali(start_dt)} تا {format_tehran_jalali(end_dt)}",
             "export_query_string": request.GET.urlencode(),
@@ -816,7 +840,7 @@ class VisitReportAdmin(admin.ModelAdmin):
         except (TypeError, ValueError):
             self.message_user(request, "بازه زمانی گزارش نامعتبر است.", messages.ERROR)
             return self.changelist_view(request)
-        queryset = get_visit_report_queryset(start_dt, end_dt).order_by("-created_at")
+        queryset = get_visit_report_queryset(start_dt, end_dt, _report_filters(request)).order_by("-created_at")
         summary = get_visit_report_summary(queryset)
         if summary["total_events"] > VISIT_REPORT_PDF_MAX_EVENTS:
             self.message_user(
@@ -831,3 +855,32 @@ class VisitReportAdmin(admin.ModelAdmin):
             filename="visit-events-report.pdf",
             content_type="application/pdf",
         )
+
+
+# Attach CSV export to VisitReportAdmin after class creation for clarity.
+def _visit_report_export_csv(self, request):
+    if not self.has_view_permission(request):
+        raise PermissionDenied
+    try:
+        start_dt, end_dt, _start_value, _end_value, _selected_range = _parse_report_range(request)
+    except (TypeError, ValueError):
+        self.message_user(request, "بازه زمانی گزارش نامعتبر است.", messages.ERROR)
+        return self.changelist_view(request)
+    queryset = get_visit_report_queryset(start_dt, end_dt, _report_filters(request)).order_by("-created_at")
+    show_raw_ip = _can_show_raw_ip(request)
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="visit-events-report.csv"'
+    response.write("\ufeff")
+    writer = csv.writer(response)
+    headers = ["created_at", "event_type", "path", "masked_ip", "ip_hash", "device_type", "browser", "os", "referrer", "utm_source", "utm_campaign", "status_code"]
+    if show_raw_ip:
+        headers.insert(4, "ip_address")
+    writer.writerow(headers)
+    for event in queryset:
+        row = [format_tehran_jalali(event.created_at), event.event_type, event.path, event.masked_ip, event.ip_hash[:12], event.device_type, event.browser, event.os, event.referrer, event.utm_source, event.utm_campaign, event.status_code or ""]
+        if show_raw_ip:
+            row.insert(4, event.ip_address or "")
+        writer.writerow(row)
+    return response
+
+VisitReportAdmin.export_csv = _visit_report_export_csv
