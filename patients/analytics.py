@@ -116,6 +116,26 @@ def _safe_metadata(metadata):
     return {str(k): v for k, v in metadata.items() if str(k) not in blocked}
 
 
+def _should_deduplicate_page_event(visitor_id, event_type, path, query_string):
+    if event_type not in {VisitEvent.EVENT_PAGE_VIEW, VisitEvent.EVENT_FORM_VIEW}:
+        return False
+    window_seconds = getattr(settings, "ANALYTICS_PAGE_VIEW_DEDUP_SECONDS", 5 * 60)
+    try:
+        window_seconds = int(window_seconds)
+    except (TypeError, ValueError):
+        window_seconds = 0
+    if window_seconds <= 0:
+        return False
+    since = timezone.now() - timezone.timedelta(seconds=window_seconds)
+    return VisitEvent.objects.filter(
+        visitor_id=visitor_id,
+        event_type=event_type,
+        path=path[:255],
+        query_string=query_string,
+        created_at__gte=since,
+    ).exists()
+
+
 def log_visit_event(request, event_type, response=None, patient=None, metadata=None, status_code=None):
     if not getattr(settings, "ANALYTICS_ENABLED", True):
         return None
@@ -126,13 +146,17 @@ def log_visit_event(request, event_type, response=None, patient=None, metadata=N
         user_agent = request.META.get("HTTP_USER_AGENT", "")
         ua_info = parse_user_agent(user_agent)
         raw_enabled = getattr(settings, "ANALYTICS_STORE_RAW_IP", False)
+        query_string = request.META.get("QUERY_STRING", "")
+        path = request.path[:255]
+        if _should_deduplicate_page_event(visitor_id, event_type, path, query_string):
+            return None
         return VisitEvent.objects.create(
             visitor_id=visitor_id,
             session_key=getattr(session, "session_key", "") or "",
             event_type=event_type,
             method=request.method[:10],
-            path=request.path[:255],
-            query_string=request.META.get("QUERY_STRING", ""),
+            path=path,
+            query_string=query_string,
             referrer=request.META.get("HTTP_REFERER", ""),
             user_agent=user_agent,
             ip_hash=hash_ip(ip),
@@ -187,9 +211,9 @@ def get_visit_report_summary(queryset):
         invalid_submits=Count("id", filter=Q(event_type=VisitEvent.EVENT_FORM_SUBMIT_INVALID)),
         error_submits=Count("id", filter=Q(event_type=VisitEvent.EVENT_FORM_SUBMIT_ERROR)),
         bot_count=Count("id", filter=Q(is_bot=True)),
-        mobile_count=Count("id", filter=Q(device_type="mobile")),
-        desktop_count=Count("id", filter=Q(device_type="desktop")),
-        tablet_count=Count("id", filter=Q(device_type="tablet")),
+        mobile_count=Count("visitor_id", filter=Q(device_type="mobile"), distinct=True),
+        desktop_count=Count("visitor_id", filter=Q(device_type="desktop"), distinct=True),
+        tablet_count=Count("visitor_id", filter=Q(device_type="tablet"), distinct=True),
     )
     daily = OrderedDict((format_tehran_jalali_date(row["day"]), row["count"]) for row in queryset.annotate(day=TruncDate("created_at", tzinfo=timezone.get_current_timezone())).values("day").annotate(count=Count("id")).order_by("day") if row["day"])
     hourly = OrderedDict((f"{hour:02d}:00", 0) for hour in range(24))
