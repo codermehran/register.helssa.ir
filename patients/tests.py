@@ -34,11 +34,13 @@ from .forms import (
 from .views import (
     COMMUNITY_BASE_COUNT,
     CANONICAL_URL,
+    FORM_ERROR_MESSAGE,
     SHARE_DESCRIPTION,
     SHARE_IMAGE_PATH,
     SHARE_TITLE,
     SITE_LOGO_PATH,
     SITE_NAME,
+    SUCCESS_MESSAGE,
 )
 from .models import SMSMessageLog, Patient
 from .sms import (
@@ -930,8 +932,15 @@ class RegisterPatientViewTests(TestCase):
         )
 
         self.assertContains(response, 'class="message-stack"')
+        self.assertContains(response, 'class="feedback-modal"')
+        self.assertContains(response, 'class="feedback-dialog"')
+        self.assertContains(response, 'role="dialog"')
+        self.assertContains(response, 'aria-modal="true"')
         self.assertContains(response, "message-card message-card--success")
         self.assertContains(response, 'class="message-card__icon"')
+        self.assertContains(response, 'data-dismiss-feedback')
+        self.assertContains(response, 'class="feedback-dialog__button"')
+        self.assertContains(response, "باشه")
         self.assertContains(response, 'class="icon icon--status"')
         self.assertContains(response, 'aria-hidden="true"')
         self.assertNotContains(response, "✓")
@@ -991,7 +1000,7 @@ class RegisterPatientViewTests(TestCase):
 
         messages = list(response.wsgi_request._messages)
         self.assertEqual(len(messages), 1)
-        self.assertEqual(str(messages[0]), "ثبت‌نام شما با موفقیت انجام شد.")
+        self.assertEqual(str(messages[0]), SUCCESS_MESSAGE)
 
     def test_post_invalid_form_renders_errors_without_saving_patient(self):
         response = self.client.post(
@@ -1006,6 +1015,9 @@ class RegisterPatientViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Patient.objects.exists())
+        self.assertContains(response, FORM_ERROR_MESSAGE)
+        self.assertContains(response, 'class="message-card message-card--error"')
+        self.assertContains(response, "باشه")
         self.assertContains(response, "شماره موبایل با 09 شروع شود.")
         self.assertTrue(response.context["form"].is_bound)
 
@@ -1029,6 +1041,7 @@ class RegisterPatientViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Patient.objects.exists())
+        self.assertContains(response, FORM_ERROR_MESSAGE)
         self.assertContains(response, DUPLICATE_MOBILE_ERROR)
         self.assertEqual(
             response.context["form"].errors["mobile"], [DUPLICATE_MOBILE_ERROR]
@@ -1052,6 +1065,7 @@ class RegisterPatientViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Patient.objects.exists())
+        self.assertContains(response, "باشه")
         self.assertContains(
             response, "در ذخیره‌سازی اطلاعات مشکلی رخ داد. لطفاً دوباره تلاش کنید."
         )

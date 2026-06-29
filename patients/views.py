@@ -15,6 +15,10 @@ from .forms import (
 from .analytics import log_visit_event
 from .models import Patient, VisitEvent
 
+SUCCESS_MESSAGE = (
+    "ثبت‌نام شما با موفقیت انجام شد. درمانگاه برای تکمیل فرآیند با شما تماس می‌گیرد."
+)
+FORM_ERROR_MESSAGE = "ثبت‌نام انجام نشد. لطفاً خطاهای فرم را اصلاح کنید."
 SAVE_ERROR = "در ذخیره‌سازی اطلاعات مشکلی رخ داد. لطفاً دوباره تلاش کنید."
 SITE_NAME = "سامانه ثبت نام پزشک خانواده دکتر حسین شبانی"
 CANONICAL_URL = "https://register.helssa.ir/"
@@ -94,6 +98,7 @@ def register_patient(request):
                     VisitEvent.EVENT_FORM_SUBMIT_ERROR,
                     metadata={"error_type": "IntegrityError"},
                 )
+                messages.error(request, FORM_ERROR_MESSAGE)
                 form.add_error("mobile", DUPLICATE_MOBILE_ERROR)
                 form.add_error("national_code", DUPLICATE_NATIONAL_CODE_ERROR)
             except DatabaseError:
@@ -102,12 +107,13 @@ def register_patient(request):
                     VisitEvent.EVENT_FORM_SUBMIT_ERROR,
                     metadata={"error_type": "DatabaseError"},
                 )
+                messages.error(request, SAVE_ERROR)
                 form.add_error(None, SAVE_ERROR)
             else:
                 _log_analytics(
                     request, VisitEvent.EVENT_FORM_SUBMIT_SUCCESS, patient=patient
                 )
-                messages.success(request, "ثبت‌نام شما با موفقیت انجام شد.")
+                messages.success(request, SUCCESS_MESSAGE)
                 return redirect("patients:register")
         else:
             _log_analytics(
@@ -115,6 +121,7 @@ def register_patient(request):
                 VisitEvent.EVENT_FORM_SUBMIT_INVALID,
                 metadata={"error_fields": list(form.errors.keys())},
             )
+            messages.error(request, FORM_ERROR_MESSAGE)
     else:
         form = PatientRegistrationForm()
 

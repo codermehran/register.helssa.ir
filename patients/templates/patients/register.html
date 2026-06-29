@@ -175,47 +175,6 @@
                 <p>فقط چند مشخصه لازم است؛ پس از ثبت، جهت تکمیل فرآیند با شما تماس گرفته می‌شود.</p>
             </div>
 
-            {% if messages %}
-                <div class="message-stack" aria-label="پیام‌های فرم">
-                    {% for message in messages %}
-                        <div class="message-card{% if message.tags %} message-card--{{ message.tags }}{% endif %}" role="status">
-                            <span class="message-card__icon" aria-hidden="true">
-                                {% if "error" in message.tags or "warning" in message.tags %}
-                                    <svg class="icon icon--status" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-                                        <path d="M12 3.25 2.7 20.1h18.6L12 3.25Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-                                        <path d="M12 8.4v5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                                        <circle cx="12" cy="17.2" r="1" fill="currentColor"/>
-                                    </svg>
-                                {% else %}
-                                    <svg class="icon icon--status" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-                                        <path d="m5 12.7 4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                    </svg>
-                                {% endif %}
-                            </span>
-                            <p>{{ message }}</p>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-
-            {% if form.non_field_errors %}
-                <div class="form-alert form-alert--error" role="alert" aria-label="خطاهای فرم">
-                    <span class="form-alert__icon" aria-hidden="true">
-                        <svg class="icon icon--status" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-                            <path d="M12 3.25 2.7 20.1h18.6L12 3.25Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-                            <path d="M12 8.4v5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                            <circle cx="12" cy="17.2" r="1" fill="currentColor"/>
-                        </svg>
-                    </span>
-
-                    <ul class="field-errors field-errors--alert">
-                        {% for error in form.non_field_errors %}
-                            <li>{{ error }}</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            {% endif %}
-
             <form class="registration-form" method="post" novalidate data-registration-form>
                 {% csrf_token %}
 
@@ -363,12 +322,45 @@
 
     </main>
 
+    {% if messages %}
+        <div class="feedback-modal" data-feedback-modal>
+            <div class="feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="feedback-title" tabindex="-1">
+                <h2 id="feedback-title">پیام ثبت‌نام</h2>
+
+                <div class="message-stack" aria-label="پیام ثبت‌نام">
+                    {% for message in messages %}
+                        <div class="message-card{% if message.tags %} message-card--{{ message.tags }}{% endif %}" role="{% if "error" in message.tags or "warning" in message.tags %}alert{% else %}status{% endif %}">
+                            <span class="message-card__icon" aria-hidden="true">
+                                {% if "error" in message.tags or "warning" in message.tags %}
+                                    <svg class="icon icon--status" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                                        <path d="M12 3.25 2.7 20.1h18.6L12 3.25Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                                        <path d="M12 8.4v5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                        <circle cx="12" cy="17.2" r="1" fill="currentColor"/>
+                                    </svg>
+                                {% else %}
+                                    <svg class="icon icon--status" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                                        <path d="m5 12.7 4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                {% endif %}
+                            </span>
+                            <p>{{ message }}</p>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <button class="feedback-dialog__button" type="button" data-dismiss-feedback>باشه</button>
+            </div>
+        </div>
+    {% endif %}
+
     <script>
         (function () {
             var form = document.querySelector('[data-registration-form]');
+            var feedbackModal = document.querySelector('[data-feedback-modal]');
             var counters = document.querySelectorAll('[data-counter]');
             var revealItems = document.querySelectorAll('.reveal');
             var parallaxItems = document.querySelectorAll('[data-parallax]');
+            var feedbackDismissButtons = document.querySelectorAll('[data-dismiss-feedback]');
             var formatter = new Intl.NumberFormat('fa-IR');
             var counterStarted = false;
 
@@ -454,6 +446,25 @@
             updateScrollProgress();
             window.addEventListener('scroll', updateScrollProgress, { passive: true });
             window.addEventListener('resize', updateScrollProgress);
+
+            if (feedbackModal) {
+                var feedbackDialog = feedbackModal.querySelector('[role="dialog"]');
+
+                if (feedbackDialog) {
+                    feedbackDialog.focus();
+                }
+            }
+
+            feedbackDismissButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    var feedback = button.closest('[data-feedback-modal]');
+
+                    if (feedback) {
+                        feedback.hidden = true;
+                        feedback.style.display = 'none';
+                    }
+                });
+            });
 
             if (!form) {
                 return;
