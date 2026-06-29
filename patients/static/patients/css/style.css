@@ -5,7 +5,6 @@
     font-display: swap;
     src:
         local("Vazirmatn"),
-        url("../fonts/vazirmatn.woff2") format("woff2"),
         url("https://cdn.jsdelivr.net/npm/@fontsource-variable/vazirmatn@5.2.8/files/vazirmatn-arabic-wght-normal.woff2") format("woff2");
 }
 

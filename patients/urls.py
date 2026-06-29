@@ -9,7 +9,7 @@ urlpatterns = [
     path("", views.register_patient, name="register"),
     path(
         "register/",
-        RedirectView.as_view(url="/", permanent=True),
+        RedirectView.as_view(url="/", permanent=True, query_string=True),
         name="register_patient",
     ),
     path("robots.txt", views.robots_txt, name="robots_txt"),

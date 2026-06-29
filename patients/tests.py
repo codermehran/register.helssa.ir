@@ -770,6 +770,18 @@ class RegisterPatientViewTests(TestCase):
         self.assertEqual(response.status_code, 301)
         self.assertEqual(response["Location"], "/")
 
+    def test_register_alias_redirect_preserves_query_string(self):
+        response = self.client.get(
+            reverse("patients:register_patient"),
+            {"utm_source": "telegram", "utm_campaign": "family-doctor"},
+        )
+
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(
+            response["Location"],
+            "/?utm_source=telegram&utm_campaign=family-doctor",
+        )
+
     def test_robots_txt_allows_site_and_points_to_sitemap(self):
         response = self.client.get(reverse("patients:robots_txt"))
 
@@ -778,7 +790,7 @@ class RegisterPatientViewTests(TestCase):
         content = response.content.decode()
         self.assertIn("User-agent: *", content)
         self.assertIn("Allow: /", content)
-        self.assertIn("Sitemap: https://register.helssa.ir/sitemap.xml", content)
+        self.assertIn(f"Sitemap: {CANONICAL_URL}sitemap.xml", content)
 
     def test_sitemap_xml_contains_only_canonical_homepage(self):
         response = self.client.get(reverse("patients:sitemap_xml"))
@@ -798,7 +810,21 @@ class RegisterPatientViewTests(TestCase):
         self.assertIn("1200×630", instructions)
         self.assertIn("512×512", instructions)
         self.assertIn(SITE_NAME, instructions)
+        self.assertIn(SHARE_TITLE, instructions)
         self.assertIn(SHARE_DESCRIPTION, instructions)
+
+    def test_missing_share_image_downgrades_twitter_card(self):
+        share_image_path = Path("patients/static") / SHARE_IMAGE_PATH
+        hidden_share_image_path = share_image_path.with_suffix(".hidden-for-test")
+        share_image_path.rename(hidden_share_image_path)
+        try:
+            response = self.client.get(reverse("patients:register"))
+        finally:
+            hidden_share_image_path.rename(share_image_path)
+
+        self.assertContains(response, '<meta name="twitter:card" content="summary">')
+        self.assertNotContains(response, '<meta name="twitter:image"')
+        self.assertNotContains(response, '<meta property="og:image"')
 
     def test_missing_site_logo_does_not_render_broken_image(self):
         logo_path = Path("patients/static") / SITE_LOGO_PATH
@@ -1032,7 +1058,7 @@ class RegisterPatientViewTests(TestCase):
 
 
 class VisitAnalyticsTests(TestCase):
-    def test_get_register_creates_page_view_event(self):
+    def test_get_register_creates_form_view_event(self):
         from .models import VisitEvent
 
         response = self.client.get(reverse("patients:register"))
@@ -1040,7 +1066,7 @@ class VisitAnalyticsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             VisitEvent.objects.filter(
-                event_type=VisitEvent.EVENT_PAGE_VIEW, path="/"
+                event_type=VisitEvent.EVENT_FORM_VIEW, path="/"
             ).count(),
             1,
         )

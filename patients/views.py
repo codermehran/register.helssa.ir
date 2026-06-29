@@ -54,8 +54,9 @@ def _absolute_static_url(request, path):
 def robots_txt(request):
     """Serve crawl instructions for search engines."""
 
+    sitemap_url = f"{CANONICAL_URL}sitemap.xml"
     return HttpResponse(
-        "User-agent: *\nAllow: /\nSitemap: https://register.helssa.ir/sitemap.xml\n",
+        f"User-agent: *\nAllow: /\nSitemap: {sitemap_url}\n",
         content_type="text/plain; charset=utf-8",
     )
 
@@ -64,10 +65,10 @@ def sitemap_xml(request):
     """Expose the canonical public landing page in an XML sitemap."""
 
     return HttpResponse(
-        """<?xml version="1.0" encoding="UTF-8"?>
+        f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://register.helssa.ir/</loc>
+    <loc>{CANONICAL_URL}</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
