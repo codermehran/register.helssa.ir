@@ -42,7 +42,7 @@ from .views import (
     SITE_NAME,
     SUCCESS_MESSAGE,
 )
-from .models import SMSMessageLog, Patient
+from .models import SMSMessageLog, Patient, VisitEvent
 from .sms import (
     KavenegarSMSConfigurationError,
     build_patient_name_token,
@@ -1094,6 +1094,27 @@ class VisitAnalyticsTests(TestCase):
         self.assertEqual(response.status_code, 301)
         self.assertEqual(VisitEvent.objects.count(), 0)
 
+    def test_repeated_register_get_from_same_visitor_is_deduplicated(self):
+        first_response = self.client.get(reverse("patients:register"))
+        second_response = self.client.get(reverse("patients:register"))
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+        self.assertEqual(
+            VisitEvent.objects.filter(event_type=VisitEvent.EVENT_FORM_VIEW).count(),
+            1,
+        )
+
+    @override_settings(ANALYTICS_PAGE_VIEW_DEDUP_SECONDS=0)
+    def test_page_view_deduplication_can_be_disabled(self):
+        self.client.get(reverse("patients:register"))
+        self.client.get(reverse("patients:register"))
+
+        self.assertEqual(
+            VisitEvent.objects.filter(event_type=VisitEvent.EVENT_FORM_VIEW).count(),
+            2,
+        )
+
     def test_invalid_post_creates_attempt_and_invalid_events_without_values(self):
         from .models import VisitEvent
 
@@ -1433,6 +1454,30 @@ class VisitAnalyticsEnhancedTests(TestCase):
         summary = get_visit_report_summary(VisitEvent.objects.all())
         self.assertEqual(summary["conversion_rate"], 50.0)
         self.assertEqual(summary["submit_success_rate"], 100.0)
+
+    def test_device_cards_count_unique_visitors_not_events(self):
+        from .analytics import get_visit_report_summary
+
+        for _ in range(3):
+            VisitEvent.objects.create(
+                visitor_id="00000000-0000-0000-0000-000000000001",
+                event_type=VisitEvent.EVENT_FORM_VIEW,
+                method="GET",
+                path="/",
+                device_type="mobile",
+            )
+        VisitEvent.objects.create(
+            visitor_id="00000000-0000-0000-0000-000000000002",
+            event_type=VisitEvent.EVENT_FORM_VIEW,
+            method="GET",
+            path="/",
+            device_type="desktop",
+        )
+
+        summary = get_visit_report_summary(VisitEvent.objects.all())
+
+        self.assertEqual(summary["mobile_count"], 1)
+        self.assertEqual(summary["desktop_count"], 1)
 
     @override_settings(ANALYTICS_SHOW_RAW_IP_TO_SUPERUSER=True)
     def test_admin_report_superuser_can_see_raw_ip_when_allowed(self):
