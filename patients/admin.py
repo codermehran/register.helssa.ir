@@ -36,8 +36,7 @@ from .datetime import (
 )
 from .analytics import get_visit_report_queryset, get_visit_report_summary
 from .models import SMSMessageLog, Patient, VisitEvent, VisitReport
-from .sms import build_patient_name_token, send_done_sms
-from .sms_logs import create_sms_message_log
+from .sms_tasks import enqueue_done_sms_for_patients
 
 logger = logging.getLogger(__name__)
 
@@ -573,9 +572,10 @@ class PatientAdmin(admin.ModelAdmin):
         "first_name",
         "last_name",
         "national_code",
-        "sms_sent_indicator",
+        "done_sms_sent",
         "created_at_jalali",
     )
+    list_editable = ("done_sms_sent",)
     search_fields = ("mobile", "national_code", "first_name", "last_name")
     ordering = ("-created_at",)
     actions = ("download_patients_pdf_report", "send_done_sms_to_patients")
@@ -602,7 +602,7 @@ class PatientAdmin(admin.ModelAdmin):
         ordering="has_successful_done_sms",
     )
     def sms_sent_indicator(self, obj):
-        return getattr(obj, "has_successful_done_sms", False)
+        return obj.done_sms_sent or getattr(obj, "has_successful_done_sms", False)
 
     @admin.display(description="زمان ثبت", ordering="created_at")
     def created_at_jalali(self, obj):
@@ -654,36 +654,14 @@ class PatientAdmin(admin.ModelAdmin):
             )
             return
 
-        sent_count = 0
-        failed_count = 0
+        patient_ids = list(queryset.values_list("pk", flat=True))
+        enqueue_done_sms_for_patients(patient_ids)
 
-        for patient in queryset:
-            token = build_patient_name_token(patient)
-
-            try:
-                response = send_done_sms(patient.mobile, token)
-            except Exception as exc:
-                failed_count += 1
-                create_sms_message_log(patient, template, token, error=exc)
-                logger.exception(
-                    "Failed to send Kavenegar done SMS to patient %s.", patient.pk
-                )
-            else:
-                sent_count += 1
-                create_sms_message_log(patient, template, token, response=response)
-
-        if sent_count:
+        if patient_ids:
             self.message_user(
                 request,
-                f"پیامک انجام شد برای {sent_count} بیمار ارسال شد.",
+                f"ارسال پیامک انجام شد برای {len(patient_ids)} بیمار در پس‌زمینه شروع شد.",
                 messages.SUCCESS,
-            )
-
-        if failed_count:
-            self.message_user(
-                request,
-                f"ارسال پیامک انجام شد برای {failed_count} بیمار ناموفق بود.",
-                messages.ERROR,
             )
 
 

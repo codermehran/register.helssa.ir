@@ -6,6 +6,7 @@ class Patient(models.Model):
     last_name = models.CharField(max_length=100)
     mobile = models.CharField(max_length=11, unique=True)
     national_code = models.CharField(max_length=10, unique=True, null=True, blank=True)
+    done_sms_sent = models.BooleanField(default=False, verbose_name="پیامک انجام شد")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

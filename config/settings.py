@@ -202,6 +202,13 @@ except (TypeError, ValueError):
 KAVENEGAR_API_KEY = _env("KAVENEGAR_API_KEY")
 KAVENEGAR_REGISTER_TEMPLATE = _env("KAVENEGAR_REGISTER_TEMPLATE", "register")
 KAVENEGAR_DONE_TEMPLATE = _env("KAVENEGAR_DONE_TEMPLATE", "register-done")
+try:
+    KAVENEGAR_REQUEST_TIMEOUT_SECONDS = float(
+        _env("KAVENEGAR_REQUEST_TIMEOUT_SECONDS", "10")
+    )
+except (TypeError, ValueError):
+    KAVENEGAR_REQUEST_TIMEOUT_SECONDS = 10.0
+SMS_SEND_ASYNC = _env_bool("SMS_SEND_ASYNC", True)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

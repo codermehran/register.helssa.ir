@@ -44,6 +44,7 @@ from .views import (
 )
 from .models import SMSMessageLog, Patient, VisitEvent
 from .sms import (
+    KavenegarSMSDeliveryError,
     KavenegarSMSConfigurationError,
     build_patient_name_token,
     send_done_sms,
@@ -252,43 +253,48 @@ class KavenegarRegisterSMSTests(TestCase):
     @override_settings(
         KAVENEGAR_API_KEY="test-api-key",
         KAVENEGAR_REGISTER_TEMPLATE="register-template",
+        KAVENEGAR_REQUEST_TIMEOUT_SECONDS=7,
     )
     def test_send_register_sms_uses_configured_template_as_template_token(self):
-        api = Mock()
-        api.verify_lookup.return_value = {"return": {"status": 200}}
+        kavenegar_response = Mock()
+        kavenegar_response.json.return_value = {
+            "return": {"status": 200},
+            "entries": [{"messageid": 123}],
+        }
 
-        with patch("patients.sms._build_kavenegar_api", return_value=api) as build_api:
+        with patch("patients.sms.requests.post", return_value=kavenegar_response) as post:
             result = send_register_sms("09123456789", "Ali_Ahmadi")
 
-        self.assertEqual(result, {"return": {"status": 200}})
-        build_api.assert_called_once_with("test-api-key")
-        api.verify_lookup.assert_called_once_with(
-            {
-                "receptor": "09123456789",
-                "template": "register-template",
-                "token": "Ali_Ahmadi",
-            }
+        self.assertEqual(result, [{"messageid": 123}])
+        post.assert_called_once()
+        self.assertEqual(
+            post.call_args.args[0],
+            "https://api.kavenegar.com/v1/test-api-key/verify/lookup.json",
         )
+        self.assertEqual(
+            post.call_args.kwargs["data"],
+            {"receptor": "09123456789", "template": "register-template", "token": "Ali_Ahmadi"},
+        )
+        self.assertEqual(post.call_args.kwargs["timeout"], 7)
 
     @override_settings(
         KAVENEGAR_API_KEY="test-api-key",
         KAVENEGAR_DONE_TEMPLATE="done-template",
     )
     def test_send_done_sms_uses_configured_done_template(self):
-        api = Mock()
-        api.verify_lookup.return_value = {"return": {"status": 200}}
+        kavenegar_response = Mock()
+        kavenegar_response.json.return_value = {
+            "return": {"status": 200},
+            "entries": [{"messageid": 456}],
+        }
 
-        with patch("patients.sms._build_kavenegar_api", return_value=api) as build_api:
+        with patch("patients.sms.requests.post", return_value=kavenegar_response) as post:
             result = send_done_sms("09123456789", "Ali_Ahmadi")
 
-        self.assertEqual(result, {"return": {"status": 200}})
-        build_api.assert_called_once_with("test-api-key")
-        api.verify_lookup.assert_called_once_with(
-            {
-                "receptor": "09123456789",
-                "template": "done-template",
-                "token": "Ali_Ahmadi",
-            }
+        self.assertEqual(result, [{"messageid": 456}])
+        self.assertEqual(
+            post.call_args.kwargs["data"],
+            {"receptor": "09123456789", "template": "done-template", "token": "Ali_Ahmadi"},
         )
 
     @override_settings(KAVENEGAR_API_KEY="test-api-key", KAVENEGAR_REGISTER_TEMPLATE="")
@@ -305,8 +311,21 @@ class KavenegarRegisterSMSTests(TestCase):
         KAVENEGAR_API_KEY="test-api-key",
         KAVENEGAR_REGISTER_TEMPLATE="register-template",
     )
+    def test_send_register_sms_raises_delivery_error_on_timeout(self):
+        with patch(
+            "patients.sms.requests.post",
+            side_effect=__import__("requests").exceptions.Timeout,
+        ):
+            with self.assertRaises(KavenegarSMSDeliveryError):
+                send_register_sms("09123456789", "Ali_Ahmadi")
+
+    @override_settings(
+        KAVENEGAR_API_KEY="test-api-key",
+        KAVENEGAR_REGISTER_TEMPLATE="register-template",
+        SMS_SEND_ASYNC=False,
+    )
     def test_patient_creation_signal_sends_register_sms_after_commit(self):
-        with patch("patients.signals.send_register_sms") as send_sms:
+        with patch("patients.sms_tasks.send_register_sms") as send_sms:
             with self.captureOnCommitCallbacks(execute=True):
                 patient = Patient.objects.create(
                     first_name="Ali",
@@ -345,7 +364,9 @@ class KavenegarRegisterSMSTests(TestCase):
         self.assertEqual(sms_log.mobile, "09123456789")
 
     @override_settings(
-        KAVENEGAR_API_KEY="test-api-key", KAVENEGAR_DONE_TEMPLATE="done-template"
+        KAVENEGAR_API_KEY="test-api-key",
+        KAVENEGAR_DONE_TEMPLATE="done-template",
+        SMS_SEND_ASYNC=False,
     )
     def test_admin_action_sends_done_sms_to_selected_patients(self):
         user = get_user_model().objects.create_superuser(
@@ -361,7 +382,7 @@ class KavenegarRegisterSMSTests(TestCase):
             national_code="1111111111",
         )
 
-        with patch("patients.admin.send_done_sms") as send_sms:
+        with patch("patients.sms_tasks.send_done_sms") as send_sms:
             response = self.client.post(
                 reverse("admin:patients_patient_changelist"),
                 {
@@ -378,10 +399,46 @@ class KavenegarRegisterSMSTests(TestCase):
         self.assertEqual(sms_log.template, "done-template")
         self.assertEqual(sms_log.token, "Ali_Ahmadi")
         self.assertEqual(sms_log.status, SMSMessageLog.STATUS_SUCCESS)
+        patient.refresh_from_db()
+        self.assertTrue(patient.done_sms_sent)
         self.assertIn(
-            "پیامک انجام شد برای 1 بیمار ارسال شد.",
+            "ارسال پیامک انجام شد برای 1 بیمار در پس‌زمینه شروع شد.",
             [message.message for message in get_messages(response.wsgi_request)],
         )
+
+    @override_settings(
+        KAVENEGAR_API_KEY="test-api-key",
+        KAVENEGAR_DONE_TEMPLATE="done-template",
+        SMS_SEND_ASYNC=True,
+    )
+    def test_admin_action_queues_done_sms_without_waiting_for_delivery(self):
+        user = get_user_model().objects.create_superuser(
+            username="async-admin",
+            email="async@example.com",
+            password="password",
+        )
+        self.client.force_login(user)
+        patient = Patient.objects.create(
+            first_name="Ali",
+            last_name="Ahmadi",
+            mobile="09123456789",
+            national_code="1111111111",
+        )
+
+        with patch("patients.admin.enqueue_done_sms_for_patients") as enqueue_done_sms:
+            response = self.client.post(
+                reverse("admin:patients_patient_changelist"),
+                {
+                    "action": "send_done_sms_to_patients",
+                    "_selected_action": [str(patient.pk)],
+                    "index": "0",
+                },
+                follow=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        enqueue_done_sms.assert_called_once_with([patient.pk])
+        self.assertFalse(SMSMessageLog.objects.filter(patient=patient).exists())
 
     @override_settings(KAVENEGAR_API_KEY="", KAVENEGAR_DONE_TEMPLATE="")
     def test_admin_action_validates_kavenegar_settings_before_patient_loop(self):
@@ -398,7 +455,7 @@ class KavenegarRegisterSMSTests(TestCase):
             national_code="1111111111",
         )
 
-        with patch("patients.admin.send_done_sms") as send_sms:
+        with patch("patients.admin.enqueue_done_sms_for_patients") as enqueue_done_sms:
             response = self.client.post(
                 reverse("admin:patients_patient_changelist"),
                 {
@@ -410,7 +467,7 @@ class KavenegarRegisterSMSTests(TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        send_sms.assert_not_called()
+        enqueue_done_sms.assert_not_called()
         self.assertFalse(SMSMessageLog.objects.exists())
         self.assertIn(
             "تنظیمات سامانه پیامک (KAVENEGAR_API_KEY یا "
@@ -470,10 +527,11 @@ class KavenegarRegisterSMSTests(TestCase):
                 "first_name",
                 "last_name",
                 "national_code",
-                "sms_sent_indicator",
+                "done_sms_sent",
                 "created_at_jalali",
             ),
         )
+        self.assertEqual(model_admin.list_editable, ("done_sms_sent",))
         self.assertNotIn("mobile", model_admin.list_display)
         self.assertIn("mobile", model_admin.get_fields(request=Mock()))
 
@@ -543,6 +601,26 @@ class KavenegarRegisterSMSTests(TestCase):
         patient_from_admin = model_admin.get_queryset(request).get(pk=patient.pk)
 
         self.assertFalse(model_admin.sms_sent_indicator(patient_from_admin))
+
+    def test_patient_admin_manual_done_sms_tick_marks_patient(self):
+        user = get_user_model().objects.create_superuser(
+            username="manual-admin",
+            email="manual@example.com",
+            password="password",
+        )
+        patient = Patient.objects.create(
+            first_name="Ali",
+            last_name="Ahmadi",
+            mobile="09123456789",
+            national_code="1111111111",
+        )
+        request = Mock(user=user)
+        model_admin = PatientAdmin(Patient, admin.site)
+
+        Patient.objects.filter(pk=patient.pk).update(done_sms_sent=True)
+        patient_from_admin = model_admin.get_queryset(request).get(pk=patient.pk)
+
+        self.assertTrue(model_admin.sms_sent_indicator(patient_from_admin))
 
     @override_settings(KAVENEGAR_DONE_TEMPLATE="done-template")
     def test_patient_admin_ignores_successful_non_done_sms(self):
@@ -666,7 +744,7 @@ class KavenegarRegisterSMSTests(TestCase):
             national_code="1111111111",
         )
 
-        with patch("patients.signals.send_register_sms") as send_sms:
+        with patch("patients.sms_tasks.send_register_sms") as send_sms:
             with self.captureOnCommitCallbacks(execute=True):
                 patient.first_name = "Reza"
                 patient.save()
