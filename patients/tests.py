@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone as datetime_timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -780,13 +781,16 @@ class RegisterPatientViewTests(TestCase):
         self.assertEqual(
             response.context["stats"]["community_count"], COMMUNITY_BASE_COUNT + 2
         )
+        self.assertEqual(response.context["stats"]["today_count"], 2)
         self.assertContains(
             response, f'data-counter data-target="{COMMUNITY_BASE_COUNT + 2}"'
         )
-        self.assertContains(response, "افراد ثبت‌نام‌کرده تا کنون")
+        self.assertContains(response, "افراد ثبت‌نام‌شده")
+        self.assertContains(response, 'data-target="2"')
         self.assertNotContains(response, "ثبت‌نام‌شده در سایت")
         self.assertNotContains(response, "جامعه همراه طرح")
-        self.assertContains(response, "چرا دکتر شبانی؟")
+        self.assertContains(response, "چرا الان؟")
+        self.assertContains(response, "مزیت‌های واقعی")
         self.assertContains(response, "تعرفه دولتی")
 
     def test_register_template_uses_persian_labels_and_submit_text(self):
@@ -796,7 +800,9 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(response, "نام")
         self.assertContains(response, "نام خانوادگی")
         self.assertContains(response, "شماره موبایل")
-        self.assertContains(response, ">ثبت‌نام</button>")
+        self.assertContains(response, "ثبت اطلاعات و دریافت پیگیری درمانگاه")
+        self.assertContains(response, "۰ از ۴ بخش تکمیل شده")
+        self.assertContains(response, 'data-sticky-cta')
 
     def test_register_template_includes_standard_copyright_footer(self):
         response = self.client.get(reverse("patients:register"))
@@ -991,7 +997,7 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(response, 'inputmode="numeric"')
         self.assertContains(response, 'maxlength="11"')
         self.assertContains(response, 'placeholder="09123456789"')
-        self.assertContains(response, "شماره موبایل باید ۱۱ رقمی و با 09 شروع شود.")
+        self.assertContains(response, "۱۱ رقم و شروع با 09.")
 
     def test_register_template_styles_messages_as_alert_cards(self):
         response = self.client.get(reverse("patients:register"))
@@ -1467,6 +1473,49 @@ class VisitAnalyticsEnhancedTests(TestCase):
         from .analytics import mask_ip
 
         self.assertEqual(mask_ip("5.122.34.77"), "5.122.34.xxx")
+
+    def test_client_engagement_endpoint_logs_allowed_event_without_sensitive_metadata(self):
+        response = self.client.post(
+            reverse("patients:analytics_event"),
+            data=json.dumps(
+                {
+                    "event_type": VisitEvent.EVENT_FIELD_COMPLETE,
+                    "metadata": {
+                        "field_name": "mobile",
+                        "mobile": "09123456789",
+                        "national_code": "1234567890",
+                        "section": "form",
+                        "raw": {"mobile": "09123456789"},
+                    },
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        event = VisitEvent.objects.get(event_type=VisitEvent.EVENT_FIELD_COMPLETE)
+        self.assertEqual(event.metadata, {"section": "form", "field_name": "mobile"})
+        self.assertNotIn("09123456789", str(event.metadata))
+        self.assertNotIn("1234567890", str(event.metadata))
+
+    def test_client_engagement_endpoint_rejects_unknown_event(self):
+        response = self.client.post(
+            reverse("patients:analytics_event"),
+            data=json.dumps({"event_type": "not_allowed", "metadata": {}}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(VisitEvent.objects.exists())
+
+    def test_register_template_wires_engagement_tracking(self):
+        response = self.client.get(reverse("patients:register"))
+
+        self.assertContains(response, reverse("patients:analytics_event"))
+        self.assertContains(response, 'data-track-click="hero_cta_click"')
+        self.assertContains(response, 'data-track-click="sticky_cta_click"')
+        self.assertContains(response, 'data-track-section="faq"')
+        self.assertContains(response, "sendEngagement")
 
     @override_settings(ANALYTICS_STORE_RAW_IP=False)
     def test_raw_ip_is_not_saved_when_disabled(self):

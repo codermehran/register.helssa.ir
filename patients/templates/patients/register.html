@@ -48,52 +48,71 @@
 <body>
     <div class="scroll-progress" aria-hidden="true"></div>
 
-    <main class="registration-page">
-        <section class="hero" aria-labelledby="page-title">
+    <a class="sticky-register-cta" href="#registration-form" data-sticky-cta data-track-click="sticky_cta_click" data-cta-location="sticky_bar">
+        <span>ثبت‌نام سریع</span>
+        <strong>کمتر از یک دقیقه</strong>
+    </a>
+
+    <main class="registration-page" data-analytics-url="{% url 'patients:analytics_event' %}">
+        <section class="hero" aria-labelledby="page-title" data-track-section="hero">
             {% if site_logo %}
                 <img class="hero__logo reveal" src="{{ site_logo.url }}" alt="{{ site_logo.alt }}" width="96" height="96">
             {% endif %}
 
-            <div class="hero__badge reveal reveal--delay-1">سامانه ثبت نام پزشک خانواده</div>
+            <div class="hero__badge reveal reveal--delay-1">ثبت‌نام فعال پزشک خانواده صغاد</div>
 
             <h1 id="page-title" class="reveal reveal--delay-2">{{ share_meta.site_name }}</h1>
 
             <p class="hero__lead reveal reveal--delay-3">
-                طرح جذب جمعیت پزشک خانواده در درمانگاه ولیعصر صغاد فعال شده است؛
-                ثبت‌نام اینترنتی پزشک خانواده صغاد را انجام دهید تا درمانگاه برای تکمیل فرآیند با شما تماس بگیرد.
+                همین حالا اطلاعات اولیه را ثبت کنید؛ درمانگاه ولیعصر صغاد برای تکمیل فرآیند با شما تماس می‌گیرد.
+                فرم کوتاه است، پیگیری واقعی است، و هزینه خدمات با تعرفه دولتی مدیریت می‌شود.
             </p>
 
             <div class="hero__actions reveal reveal--delay-4" aria-label="اقدام سریع">
-                <a class="hero__button" href="#registration-form">ثبت‌نام سریع</a>
-                <span class="hero__note">مهم نیست پزشک خانواده فعلی شما چه کسی است.</span>
+                <a class="hero__button" href="#registration-form" data-track-click="hero_cta_click" data-cta-location="hero_primary">شروع ثبت‌نام سریع</a>
+                <span class="hero__note">کمتر از یک دقیقه زمان می‌برد.</span>
             </div>
 
-            <div class="hero__visual reveal reveal--delay-5" data-parallax="0.12" aria-hidden="true">
-                <div class="hero-device">
-                    <span class="hero-device__bar"></span>
-                    <span class="hero-device__line hero-device__line--wide"></span>
-                    <span class="hero-device__line"></span>
-                    <div class="hero-device__grid">
-                        <span></span>
-                        <span></span>
-                        <span></span>
+            <div class="hero__visual hero__visual--brand reveal reveal--delay-5" data-parallax="0.12" aria-hidden="true">
+                <div class="brand-orbit">
+                    <span class="brand-orbit__pulse"></span>
+                    <span class="brand-orbit__ring brand-orbit__ring--outer"></span>
+                    <span class="brand-orbit__ring brand-orbit__ring--inner"></span>
+                    <div class="brand-orbit__center">
+                        <strong>۱ دقیقه</strong>
+                    </div>
+                    <div class="brand-orbit__floating-copy">
+                        <span>تعرفه دولتی</span>
+                        <span>پیگیری درمانگاه</span>
+                        <span>ثبت سریع</span>
                     </div>
                 </div>
             </div>
 
             <div class="stats-strip reveal reveal--delay-5" aria-label="آمار ثبت‌نام">
                 <div class="stats-card stats-card--primary">
-                    <span class="stats-card__label">افراد ثبت‌نام‌کرده تا کنون</span>
+                    <span class="stats-card__label">افراد ثبت‌نام‌شده</span>
                     <strong class="stats-card__number" data-counter data-target="{{ stats.community_count }}">۰</strong>
+                    <span class="stats-card__caption">نفر</span>
+                </div>
+                <div class="stats-card stats-card--today">
+                    <span class="stats-card__label">ثبت‌نام امروز</span>
+                    <strong class="stats-card__number stats-card__number--small" data-counter data-target="{{ stats.today_count }}">۰</strong>
                     <span class="stats-card__caption">نفر</span>
                 </div>
             </div>
 
         </section>
 
-        <section class="promo-panel reveal reveal--delay-6" aria-labelledby="promo-title">
+        <section class="urgency-strip reveal reveal--delay-6" aria-labelledby="urgency-title" data-track-section="why-now">
+            <p class="eyebrow">چرا الان؟</p>
+            <h2 id="urgency-title">هرچه زودتر ثبت کنید، پیگیری درمانگاه زودتر شروع می‌شود.</h2>
+            <p>اطلاعات اولیه شما برای تماس، بررسی و تکمیل ثبت‌نام استفاده می‌شود؛ لازم نیست برای شروع فرآیند حضوری مراجعه کنید.</p>
+        </section>
+
+        <section class="promo-panel reveal reveal--delay-6" aria-labelledby="promo-title" data-track-section="benefits">
             <div class="promo-panel__header">
-                <p class="eyebrow">چرا دکتر شبانی؟</p>
+                <p class="eyebrow">مزیت‌های واقعی</p>
                 <h2 id="promo-title">خدمات منظم‌تر، هزینه کمتر، پیگیری واقعی سلامت خانواده</h2>
                 <p>
                     با ثبت‌نام در طرح پزشک خانواده دکتر حسین شبانی، دسترسی شما به خدمات درمانی
@@ -125,7 +144,7 @@
             </div>
         </section>
 
-        <section class="flow-section" aria-labelledby="flow-title">
+        <section class="flow-section" aria-labelledby="flow-title" data-track-section="flow">
             <div class="flow-section__copy reveal">
                 <p class="eyebrow">مسیر ثبت‌نام</p>
                 <h2 id="flow-title">ثبت اطلاعات، بررسی، تماس درمانگاه</h2>
@@ -168,17 +187,36 @@
             </div>
         </section>
 
-        <section id="registration-form" class="form-card reveal reveal--delay-7" aria-labelledby="form-title">
+        <section class="trust-panel reveal" aria-labelledby="trust-title" data-track-section="trust">
+            <div>
+                <p class="eyebrow">اعتماد و پیگیری درمانگاه</p>
+                <h2 id="trust-title">ثبت اولیه است؛ تصمیم نهایی با تماس و تکمیل اطلاعات انجام می‌شود.</h2>
+            </div>
+            <ul>
+                <li>اطلاعات شما برای تماس درمانگاه و پیگیری ثبت‌نام استفاده می‌شود.</li>
+                <li>پس از ثبت موفق، پیام تأیید را همین‌جا می‌بینید.</li>
+                <li>خطای پیامک یا سرویس بیرونی مانع ثبت اطلاعات شما نمی‌شود.</li>
+            </ul>
+        </section>
+
+        <section id="registration-form" class="form-card reveal reveal--delay-7" aria-labelledby="form-title" data-track-section="form">
             <div class="form-card__header">
                 <p class="eyebrow">فرم ثبت اطلاعات</p>
                 <h2 id="form-title">ثبت‌نام اولیه بیمار</h2>
                 <p>فقط چند مشخصه لازم است؛ پس از ثبت، جهت تکمیل فرآیند با شما تماس گرفته می‌شود.</p>
             </div>
 
+            <div class="form-progress" aria-label="پیشرفت تکمیل فرم">
+                <div class="form-progress__bar" aria-hidden="true">
+                    <span data-form-progress-bar></span>
+                </div>
+                <strong data-form-progress-text>۰ از ۴ بخش تکمیل شده</strong>
+            </div>
+
             <form class="registration-form" method="post" novalidate data-registration-form>
                 {% csrf_token %}
 
-                <div class="form-field reveal reveal--delay-5">
+                <div class="form-field reveal reveal--delay-5" data-progress-field="first_name">
                     <label for="{{ form.first_name.id_for_label }}">
                         <svg class="icon form-field__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
                             <path d="M12 12.2a4.1 4.1 0 1 0 0-8.2 4.1 4.1 0 0 0 0 8.2Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
@@ -205,7 +243,7 @@
                     {% endif %}
                 </div>
 
-                <div class="form-field reveal reveal--delay-6">
+                <div class="form-field reveal reveal--delay-6" data-progress-field="last_name">
                     <label for="{{ form.last_name.id_for_label }}">
                         <svg class="icon form-field__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
                             <path d="M12 12.2a4.1 4.1 0 1 0 0-8.2 4.1 4.1 0 0 0 0 8.2Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
@@ -232,7 +270,7 @@
                     {% endif %}
                 </div>
 
-                <div class="form-field reveal reveal--delay-7">
+                <div class="form-field reveal reveal--delay-7" data-progress-field="national_code">
                     <label for="{{ form.national_code.id_for_label }}">
                         <svg class="icon form-field__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
                             <rect x="4" y="4.5" width="16" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
@@ -243,7 +281,7 @@
 
                     {{ form.national_code }}
 
-                    <p class="form-hint" id="national-code-help">کد ملی باید ۱۰ رقمی باشد.</p>
+                    <p class="form-hint" id="national-code-help">۱۰ رقم، بدون خط تیره.</p>
 
                     {% if form.national_code.errors %}
                         <ul class="field-errors" aria-label="خطاهای کد ملی">
@@ -261,7 +299,7 @@
                     {% endif %}
                 </div>
 
-                <div class="form-field reveal reveal--delay-8">
+                <div class="form-field reveal reveal--delay-8" data-progress-field="mobile">
                     <label for="{{ form.mobile.id_for_label }}">
                         <svg class="icon form-field__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
                             <rect x="7" y="2.8" width="10" height="18.4" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/>
@@ -272,7 +310,7 @@
 
                     {{ form.mobile }}
 
-                    <p class="form-hint" id="mobile-help">شماره موبایل باید ۱۱ رقمی و با 09 شروع شود.</p>
+                    <p class="form-hint" id="mobile-help">۱۱ رقم و شروع با 09.</p>
 
                     {% if form.mobile.errors %}
                         <ul class="field-errors" aria-label="خطاهای شماره موبایل">
@@ -290,18 +328,26 @@
                     {% endif %}
                 </div>
 
-                <button type="submit" data-submit-button data-submitting-text="در حال ثبت...">ثبت‌نام</button>
+                <button type="submit" data-submit-button data-submitting-text="در حال ثبت...">ثبت اطلاعات و دریافت پیگیری درمانگاه</button>
             </form>
         </section>
 
-        <aside class="help-card reveal reveal--delay-9" aria-label="راهنمای ثبت‌نام">
-            <h2>راهنمای کوتاه</h2>
-            <ul>
-                <li>کد ملی را ۱۰ رقمی و شماره موبایل را ۱۱ رقمی وارد کنید.</li>
-                <li>پس از ثبت، پیام تأیید را همین‌جا می‌بینید و درمانگاه با شما تماس می‌گیرد.</li>
-                <li>اگر خطایی دیدید، همان بخش را اصلاح کنید.</li>
-            </ul>
-        </aside>
+        <section class="faq-panel reveal reveal--delay-9" aria-labelledby="faq-title" data-track-section="faq">
+            <p class="eyebrow">سؤال‌های پرتکرار</p>
+            <h2 id="faq-title">قبل از ثبت‌نام چه چیزهایی را بدانم؟</h2>
+            <details>
+                <summary>اگر پزشک خانواده فعلی من شخص دیگری باشد چه؟</summary>
+                <p>برای شروع ثبت اولیه مشکلی نیست؛ وضعیت شما در مرحله پیگیری بررسی می‌شود.</p>
+            </details>
+            <details>
+                <summary>بعد از ثبت فرم چه اتفاقی می‌افتد؟</summary>
+                <p>درمانگاه از روی اطلاعات ثبت‌شده برای تکمیل فرآیند با شما تماس می‌گیرد.</p>
+            </details>
+            <details>
+                <summary>اطلاعات را اشتباه وارد کنم چه کنم؟</summary>
+                <p>اگر فرم خطا بدهد، همان بخش را اصلاح کنید. اگر ثبت موفق شد، در تماس درمانگاه امکان پیگیری وجود دارد.</p>
+            </details>
+        </section>
 
         <a class="bottom-social-cta reveal reveal--delay-4" href="https://eitaa.ir/helssaa" target="_blank" rel="noopener noreferrer" aria-label="مشاهده صفحه هلسا در ایتا">
             <span class="bottom-social-cta__icon" aria-hidden="true">
@@ -355,19 +401,67 @@
 
     <script>
         (function () {
+            var page = document.querySelector('.registration-page');
             var form = document.querySelector('[data-registration-form]');
             var feedbackModal = document.querySelector('[data-feedback-modal]');
             var counters = document.querySelectorAll('[data-counter]');
             var revealItems = document.querySelectorAll('.reveal');
             var parallaxItems = document.querySelectorAll('[data-parallax]');
             var feedbackDismissButtons = document.querySelectorAll('[data-dismiss-feedback]');
+            var stickyCta = document.querySelector('[data-sticky-cta]');
+            var progressFields = document.querySelectorAll('[data-progress-field]');
+            var progressBar = document.querySelector('[data-form-progress-bar]');
+            var progressText = document.querySelector('[data-form-progress-text]');
             var formatter = new Intl.NumberFormat('fa-IR');
             var counterStarted = false;
+            var analyticsUrl = page ? page.dataset.analyticsUrl : '';
+            var csrfInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
+            var csrfToken = csrfInput ? csrfInput.value : '';
+            var sentKeys = {};
+            var scrollDepths = [25, 50, 75, 100];
+
+            function sendEngagement(eventType, metadata) {
+                if (!analyticsUrl || !eventType || !window.fetch) {
+                    return;
+                }
+
+                window.fetch(analyticsUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({
+                        event_type: eventType,
+                        metadata: metadata || {}
+                    })
+                }).catch(function () {});
+            }
+
+            function sendOnce(key, eventType, metadata) {
+                if (sentKeys[key]) {
+                    return;
+                }
+
+                sentKeys[key] = true;
+                sendEngagement(eventType, metadata);
+            }
 
             function updateScrollProgress() {
                 var scrollable = document.documentElement.scrollHeight - window.innerHeight;
                 var progress = scrollable > 0 ? window.scrollY / scrollable : 0;
                 document.documentElement.style.setProperty('--scroll-progress', Math.max(0, Math.min(progress, 1)));
+
+                if (stickyCta) {
+                    stickyCta.classList.toggle('is-visible', window.scrollY > 280);
+                }
+
+                scrollDepths.forEach(function (depth) {
+                    if (progress * 100 >= depth) {
+                        sendOnce('scroll-' + depth, 'scroll_depth', { depth: String(depth) });
+                    }
+                });
 
                 parallaxItems.forEach(function (item) {
                     var depth = Number(item.dataset.parallax || 0);
@@ -410,6 +504,52 @@
                 counters.forEach(animateCounter);
             }
 
+            function isFieldComplete(input) {
+                if (!input) {
+                    return false;
+                }
+
+                var value = input.value.trim();
+                if (input.name === 'national_code') {
+                    return /^\d{10}$/.test(value);
+                }
+                if (input.name === 'mobile') {
+                    return /^09\d{9}$/.test(value);
+                }
+                return value.length > 0;
+            }
+
+            function updateFormProgress() {
+                var completeCount = 0;
+
+                progressFields.forEach(function (field) {
+                    var input = field.querySelector('input');
+                    var complete = isFieldComplete(input);
+                    field.classList.toggle('is-complete', complete);
+
+                    if (complete) {
+                        completeCount += 1;
+                        sendOnce('field-' + input.name, 'field_complete', { field_name: input.name });
+                    }
+                });
+
+                if (progressBar) {
+                    progressBar.style.width = ((completeCount / 4) * 100) + '%';
+                }
+
+                if (progressText) {
+                    progressText.textContent = formatter.format(completeCount) + ' از ۴ بخش تکمیل شده';
+                }
+            }
+
+            document.querySelectorAll('[data-track-click]').forEach(function (element) {
+                element.addEventListener('click', function () {
+                    sendEngagement(element.dataset.trackClick, {
+                        cta_location: element.dataset.ctaLocation || ''
+                    });
+                });
+            });
+
             if ('IntersectionObserver' in window) {
                 var revealObserver = new IntersectionObserver(function (entries) {
                     entries.forEach(function (entry) {
@@ -435,6 +575,22 @@
 
                 counters.forEach(function (counter) {
                     counterObserver.observe(counter);
+                });
+
+                var sectionObserver = new IntersectionObserver(function (entries) {
+                    entries.forEach(function (entry) {
+                        if (entry.isIntersecting) {
+                            sendOnce(
+                                'section-' + entry.target.dataset.trackSection,
+                                'section_view',
+                                { section: entry.target.dataset.trackSection }
+                            );
+                        }
+                    });
+                }, { threshold: 0.42 });
+
+                document.querySelectorAll('[data-track-section]').forEach(function (section) {
+                    sectionObserver.observe(section);
                 });
             } else {
                 revealItems.forEach(function (item) {
@@ -469,6 +625,16 @@
             if (!form) {
                 return;
             }
+
+            form.querySelectorAll('input').forEach(function (input) {
+                input.addEventListener('focus', function () {
+                    sendOnce('form-start', 'form_start', { section: 'form' });
+                });
+                input.addEventListener('input', updateFormProgress);
+                input.addEventListener('blur', updateFormProgress);
+            });
+
+            updateFormProgress();
 
             form.addEventListener('submit', function (event) {
                 if (form.dataset.submitted === 'true') {

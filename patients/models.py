@@ -51,6 +51,12 @@ class SMSMessageLog(models.Model):
 class VisitEvent(models.Model):
     EVENT_PAGE_VIEW = "page_view"
     EVENT_FORM_VIEW = "form_view"
+    EVENT_HERO_CTA_CLICK = "hero_cta_click"
+    EVENT_STICKY_CTA_CLICK = "sticky_cta_click"
+    EVENT_SECTION_VIEW = "section_view"
+    EVENT_FORM_START = "form_start"
+    EVENT_FIELD_COMPLETE = "field_complete"
+    EVENT_SCROLL_DEPTH = "scroll_depth"
     EVENT_FORM_SUBMIT_ATTEMPT = "form_submit_attempt"
     EVENT_FORM_SUBMIT_SUCCESS = "form_submit_success"
     EVENT_FORM_SUBMIT_INVALID = "form_submit_invalid"
@@ -59,6 +65,12 @@ class VisitEvent(models.Model):
     EVENT_TYPE_CHOICES = (
         (EVENT_PAGE_VIEW, "بازدید صفحه"),
         (EVENT_FORM_VIEW, "مشاهده فرم"),
+        (EVENT_HERO_CTA_CLICK, "کلیک CTA اصلی"),
+        (EVENT_STICKY_CTA_CLICK, "کلیک CTA چسبان"),
+        (EVENT_SECTION_VIEW, "مشاهده بخش صفحه"),
+        (EVENT_FORM_START, "شروع تکمیل فرم"),
+        (EVENT_FIELD_COMPLETE, "تکمیل فیلد فرم"),
+        (EVENT_SCROLL_DEPTH, "عمق اسکرول"),
         (EVENT_FORM_SUBMIT_ATTEMPT, "تلاش ثبت‌نام"),
         (EVENT_FORM_SUBMIT_SUCCESS, "ثبت‌نام موفق"),
         (EVENT_FORM_SUBMIT_INVALID, "ثبت‌نام نامعتبر"),

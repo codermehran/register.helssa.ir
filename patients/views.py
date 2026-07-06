@@ -3,9 +3,11 @@ import json
 from django.conf import settings
 from django.contrib import messages
 from django.db import DatabaseError, IntegrityError, transaction
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.templatetags.static import static
+from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from .forms import (
     DUPLICATE_MOBILE_ERROR,
@@ -30,13 +32,22 @@ SHARE_DESCRIPTION = (
 SHARE_IMAGE_PATH = "patients/images/share-logo.png"
 SITE_LOGO_PATH = "patients/images/site-logo.png"
 COMMUNITY_BASE_COUNT = 1008
+ENGAGEMENT_EVENT_TYPES = {
+    VisitEvent.EVENT_HERO_CTA_CLICK,
+    VisitEvent.EVENT_STICKY_CTA_CLICK,
+    VisitEvent.EVENT_SECTION_VIEW,
+    VisitEvent.EVENT_FORM_START,
+    VisitEvent.EVENT_FIELD_COMPLETE,
+    VisitEvent.EVENT_SCROLL_DEPTH,
+}
+ENGAGEMENT_METADATA_KEYS = {"section", "depth", "field_name", "cta_location"}
 
 
 def _log_analytics(request, event_type, **kwargs):
     try:
-        log_visit_event(request, event_type, **kwargs)
+        return log_visit_event(request, event_type, **kwargs)
     except Exception:
-        pass
+        return None
 
 
 def _static_source_exists(path):
@@ -80,6 +91,40 @@ def sitemap_xml(request):
 """,
         content_type="application/xml; charset=utf-8",
     )
+
+
+def _safe_engagement_metadata(value):
+    if not isinstance(value, dict):
+        return {}
+
+    metadata = {}
+    for key in ENGAGEMENT_METADATA_KEYS:
+        raw_value = value.get(key)
+        if raw_value is None:
+            continue
+        metadata[key] = str(raw_value)[:80]
+    return metadata
+
+
+@require_POST
+def analytics_event(request):
+    """Log client-side engagement events without storing form values."""
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return JsonResponse({"ok": False, "error": "invalid_json"}, status=400)
+
+    event_type = payload.get("event_type")
+    if event_type not in ENGAGEMENT_EVENT_TYPES:
+        return JsonResponse({"ok": False, "error": "invalid_event"}, status=400)
+
+    event = _log_analytics(
+        request,
+        event_type,
+        metadata=_safe_engagement_metadata(payload.get("metadata", {})),
+    )
+    return JsonResponse({"ok": True, "logged": event is not None})
 
 
 def register_patient(request):
@@ -164,10 +209,17 @@ def register_patient(request):
         "inLanguage": "fa-IR",
     }
 
+    now = timezone.localtime()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timezone.timedelta(days=1)
     registered_count = Patient.objects.count()
     stats = {
         "community_count": registered_count + COMMUNITY_BASE_COUNT,
         "base_count": COMMUNITY_BASE_COUNT,
+        "today_count": Patient.objects.filter(
+            created_at__gte=today_start,
+            created_at__lt=today_end,
+        ).count(),
     }
 
     return render(
