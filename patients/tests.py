@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timezone as datetime_timezone
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -9,6 +10,7 @@ from django.contrib.messages import get_messages
 from django.db import DatabaseError, IntegrityError
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from openpyxl import load_workbook
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import registerFontFamily
 from reportlab.pdfbase.pdfmetrics import Font
@@ -16,6 +18,7 @@ from reportlab.pdfbase.pdfmetrics import Font
 from .admin import (
     PatientAdmin,
     PatientAdminForm,
+    build_patients_excel,
     build_patients_pdf,
     SMSMessageLogAdmin,
     SMSMessageLogInline,
@@ -506,6 +509,56 @@ class KavenegarRegisterSMSTests(TestCase):
         content = b"".join(response.streaming_content)
         self.assertTrue(content.startswith(b"%PDF"))
 
+    def test_admin_action_downloads_excel_report_for_selected_patients(self):
+        user = get_user_model().objects.create_superuser(
+            username="admin-excel",
+            email="admin-excel@example.com",
+            password="password",
+        )
+        self.client.force_login(user)
+        patient = Patient.objects.create(
+            first_name="Ali",
+            last_name="Ahmadi",
+            mobile="09123456789",
+            national_code="1111111111",
+        )
+
+        response = self.client.post(
+            reverse("admin:patients_patient_changelist"),
+            {
+                "action": "download_patients_excel_report",
+                "_selected_action": [str(patient.pk)],
+                "index": "0",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        self.assertIn(
+            "selected-patients-report.xlsx", response["Content-Disposition"]
+        )
+        content = b"".join(response.streaming_content)
+        workbook = load_workbook(BytesIO(content))
+        worksheet = workbook.active
+        self.assertEqual(
+            [cell.value for cell in worksheet[1]],
+            ["ردیف", "نام", "نام خانوادگی", "موبایل", "کد ملی", "زمان ثبت"],
+        )
+        self.assertEqual(
+            [cell.value for cell in worksheet[2]],
+            [
+                1,
+                "Ali",
+                "Ahmadi",
+                "09123456789",
+                "1111111111",
+                format_tehran_jalali(patient.created_at),
+            ],
+        )
+
     def test_build_patients_pdf_returns_pdf_buffer(self):
         register_test_pdf_fonts()
         patient = Patient.objects.create(
@@ -518,6 +571,19 @@ class KavenegarRegisterSMSTests(TestCase):
         pdf_buffer = build_patients_pdf([patient])
 
         self.assertTrue(pdf_buffer.getvalue().startswith(b"%PDF"))
+
+    def test_build_patients_excel_returns_xlsx_buffer(self):
+        patient = Patient.objects.create(
+            first_name="علی",
+            last_name="احمدی",
+            mobile="09123456789",
+            national_code="1111111111",
+        )
+
+        excel_buffer = build_patients_excel([patient])
+        workbook = load_workbook(excel_buffer)
+
+        self.assertEqual(workbook.active["B2"].value, "علی")
 
     def test_patient_admin_list_shows_national_code_instead_of_mobile(self):
         model_admin = PatientAdmin(Patient, admin.site)
