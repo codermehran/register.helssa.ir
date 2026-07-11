@@ -1316,78 +1316,91 @@ body > * {
 }
 
 .bottom-social-cta {
+    position: fixed;
+    inset: auto auto 1rem 1rem;
+    z-index: 45;
     display: inline-flex;
-    width: min(calc(100% - 2rem), 28rem);
+    max-width: min(calc(100% - 2rem), 22rem);
     align-items: center;
     justify-content: center;
-    justify-self: center;
-    gap: 0.75rem;
-    padding: 0.72rem 0.95rem;
-    border: 1px solid rgba(15, 118, 110, 0.22);
+    gap: 0.55rem;
+    padding: 0.48rem 0.55rem 0.48rem 0.7rem;
+    border: 1px solid rgba(15, 118, 110, 0.2);
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.94);
     color: var(--text);
+    direction: rtl;
     text-align: right;
-    text-decoration: none;
-    box-shadow: var(--shadow-sm);
-    backdrop-filter: blur(10px);
-    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease, background 180ms ease;
-}
-
-.bottom-social-cta:hover,
-.bottom-social-cta:focus,
-.bottom-social-cta:focus-visible {
-    border-color: rgba(15, 118, 110, 0.46);
-    background: var(--surface);
     box-shadow: var(--shadow-md);
-    outline: none;
-    transform: translateY(-3px);
+    backdrop-filter: blur(14px);
 }
 
-.bottom-social-cta__icon {
-    display: inline-flex;
-    width: 2.75rem;
-    height: 2.75rem;
+.bottom-social-cta__text {
     flex: 0 0 auto;
+    color: var(--heading);
+    font-size: 0.85rem;
+    font-weight: 900;
+    line-height: 1.6;
+    white-space: nowrap;
+}
+
+.bottom-social-cta__links {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.bottom-social-cta__link {
+    display: inline-flex;
+    min-width: 3.55rem;
+    min-height: 2rem;
     align-items: center;
     justify-content: center;
+    gap: 0.28rem;
+    padding: 0.28rem 0.42rem;
+    border: 1px solid rgba(15, 118, 110, 0.16);
     border-radius: 999px;
+    background: var(--surface-soft);
+    color: var(--primary-strong);
+    font-size: 0.78rem;
+    font-weight: 900;
+    line-height: 1.4;
+    text-decoration: none;
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.bottom-social-cta__link:hover,
+.bottom-social-cta__link:focus,
+.bottom-social-cta__link:focus-visible {
+    border-color: rgba(15, 118, 110, 0.4);
     background: var(--primary-strong);
     color: #ffffff;
+    box-shadow: var(--shadow-sm);
+    outline: none;
+    transform: translateY(-2px);
 }
 
 .bottom-social-cta__svg {
     display: block;
-    width: 1.35rem;
-    height: 1.35rem;
-    fill: currentColor;
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
 }
 
 .bottom-social-cta__svg path:last-child {
-    fill: none;
-    stroke: rgba(255, 255, 255, 0.72);
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-width: 1.35;
+    stroke: rgba(255, 255, 255, 0.82);
 }
 
-.bottom-social-cta__content {
-    display: grid;
-    gap: 0.02rem;
+.bottom-social-cta__link:hover .bottom-social-cta__svg path:first-child,
+.bottom-social-cta__link:focus .bottom-social-cta__svg path:first-child,
+.bottom-social-cta__link:focus-visible .bottom-social-cta__svg path:first-child {
+    fill: #ffffff;
 }
 
-.bottom-social-cta__content strong {
-    color: var(--heading);
-    font-size: 0.96rem;
-    font-weight: 900;
-    line-height: 1.45;
-}
-
-.bottom-social-cta__content span {
-    overflow-wrap: anywhere;
-    color: var(--muted);
-    font-size: 0.78rem;
-    line-height: 1.4;
+.bottom-social-cta__link:hover .bottom-social-cta__svg path:last-child,
+.bottom-social-cta__link:focus .bottom-social-cta__svg path:last-child,
+.bottom-social-cta__link:focus-visible .bottom-social-cta__svg path:last-child {
+    stroke: var(--primary-strong);
 }
 
 .site-footer {
@@ -1660,8 +1673,20 @@ body > * {
     }
 
     .bottom-social-cta {
-        width: 100%;
+        inset: auto 0.85rem 5rem;
+        width: calc(100% - 1.7rem);
+        max-width: none;
+        justify-content: space-between;
         border-radius: var(--radius-control);
+    }
+
+    .bottom-social-cta__links {
+        flex: 0 0 auto;
+    }
+
+    .bottom-social-cta__link {
+        min-width: 3.25rem;
+        padding-inline: 0.38rem;
     }
 
     .sticky-register-cta {
@@ -1676,7 +1701,7 @@ body > * {
     }
 
     .site-footer {
-        padding-bottom: 4.25rem;
+        padding-bottom: 7.4rem;
     }
 }
 
