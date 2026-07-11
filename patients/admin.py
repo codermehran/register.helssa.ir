@@ -18,6 +18,8 @@ from django.db.models import Exists, OuterRef
 from django.urls import path
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import A4, landscape
@@ -425,6 +427,56 @@ def build_patients_pdf(patients):
     return buffer
 
 
+def build_patients_excel(patients):
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "گزارش بیماران"
+    worksheet.sheet_view.rightToLeft = True
+
+    headers = ["ردیف", "نام", "نام خانوادگی", "موبایل", "کد ملی", "زمان ثبت"]
+    worksheet.append(headers)
+
+    header_fill = PatternFill("solid", fgColor="EAF2F8")
+    header_font = Font(bold=True, color="1F2D3D")
+    alignment = Alignment(horizontal="right", vertical="center")
+
+    for cell in worksheet[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = alignment
+
+    for index, patient in enumerate(patients, start=1):
+        worksheet.append(
+            [
+                index,
+                patient.first_name,
+                patient.last_name,
+                patient.mobile,
+                patient.national_code,
+                format_tehran_jalali(patient.created_at),
+            ]
+        )
+
+    column_widths = {
+        "A": 8,
+        "B": 18,
+        "C": 22,
+        "D": 18,
+        "E": 18,
+        "F": 24,
+    }
+    for column, width in column_widths.items():
+        worksheet.column_dimensions[column].width = width
+    for row in worksheet.iter_rows():
+        for cell in row:
+            cell.alignment = alignment
+
+    buffer = BytesIO()
+    workbook.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
 class PatientAdminForm(forms.ModelForm):
     class Meta:
         model = Patient
@@ -578,7 +630,11 @@ class PatientAdmin(admin.ModelAdmin):
     list_editable = ("done_sms_sent",)
     search_fields = ("mobile", "national_code", "first_name", "last_name")
     ordering = ("-created_at",)
-    actions = ("download_patients_pdf_report", "send_done_sms_to_patients")
+    actions = (
+        "download_patients_pdf_report",
+        "download_patients_excel_report",
+        "send_done_sms_to_patients",
+    )
     inlines = (SMSMessageLogInline,)
 
     class Media:
@@ -639,6 +695,30 @@ class PatientAdmin(admin.ModelAdmin):
             as_attachment=True,
             filename="selected-patients-report.pdf",
             content_type="application/pdf",
+        )
+
+    @admin.action(description="دانلود گزارش Excel بیماران انتخاب‌شده")
+    def download_patients_excel_report(self, request, queryset):
+        patients = list(
+            queryset.order_by("last_name", "first_name", "id").only(
+                "first_name",
+                "last_name",
+                "mobile",
+                "national_code",
+                "created_at",
+            )
+        )
+        logger.info(
+            "Admin user %s exported a patients Excel report with %s records.",
+            getattr(request.user, "pk", None),
+            len(patients),
+        )
+        excel_buffer = build_patients_excel(patients)
+        return FileResponse(
+            excel_buffer,
+            as_attachment=True,
+            filename="selected-patients-report.xlsx",
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
     @admin.action(description="ارسال پیامک انجام شد برای بیماران انتخاب‌شده")
