@@ -810,6 +810,15 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(response, '<footer class="site-footer')
         self.assertContains(response, "&copy; 2026 Helssa. All rights reserved.")
 
+    def test_register_template_includes_bottom_social_contact_bar(self):
+        response = self.client.get(reverse("patients:register"))
+
+        self.assertContains(response, "سوالی داری؟")
+        self.assertContains(response, 'href="https://ble.ir/helssaaa"')
+        self.assertContains(response, 'href="https://eitaa.ir/helssaaa"')
+        self.assertContains(response, 'aria-label="پرسش از هلسا در پیام‌رسان بله"')
+        self.assertContains(response, 'aria-label="پرسش از هلسا در پیام‌رسان ایتا"')
+
     def test_register_template_includes_share_preview_metadata(self):
         response = self.client.get(reverse("patients:register"))
 
