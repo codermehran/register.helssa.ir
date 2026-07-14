@@ -84,10 +84,16 @@ def _absolute_static_url(request, path):
     return request.build_absolute_uri(static_url)
 
 
-def get_apk_download_url(request):
-    """Build the public APK download URL used by links and QR codes."""
+def get_apk_download_url(request=None):
+    """Return the relative public APK download URL used by page links."""
 
-    return request.build_absolute_uri(reverse("patients:download_helssa_apk"))
+    return reverse("patients:download_helssa_apk")
+
+
+def get_absolute_apk_download_url(request):
+    """Build an absolute APK download URL for QR code payloads."""
+
+    return request.build_absolute_uri(get_apk_download_url())
 
 
 def get_configured_apk_download_path():
@@ -357,7 +363,7 @@ def helssa_apk_qr_svg(request):
     """Return an SVG QR code that points to the APK download URL."""
 
     image = qrcode.make(
-        get_apk_download_url(request),
+        get_absolute_apk_download_url(request),
         image_factory=qrcode.image.svg.SvgPathImage,
         box_size=12,
         border=2,

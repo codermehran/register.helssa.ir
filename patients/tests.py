@@ -2304,7 +2304,7 @@ class ApkDownloadTests(TestCase):
     def test_register_page_exposes_apk_download_link_and_qr_code(self):
         response = self.client.get("/")
 
-        self.assertContains(response, 'href="http://testserver/down/helssa.apk"')
+        self.assertContains(response, 'href="/down/helssa.apk"')
         self.assertContains(response, ">دانلود هلسا</a>")
         self.assertContains(response, 'src="http://testserver/down/helssa-qr.svg"')
 
