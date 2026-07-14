@@ -1920,6 +1920,27 @@ class ApkDownloadTests(TestCase):
         self.assertContains(response, "fetch(statusUrl")
         self.assertContains(response, "آپلود فایل APK ناموفق بود")
 
+    def test_admin_index_builds_ajax_form_data_before_disabling_file_input(self):
+        user = get_user_model().objects.create_superuser(
+            username="apk-formdata-admin",
+            email="apk-formdata-admin@example.com",
+            password="password",
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("admin:index"))
+        content = response.content.decode()
+
+        self.assertIn('name="apk_file"', content)
+        set_progress_index = content.index("setProgress(0);")
+        form_data_index = content.index("const formData = new FormData(form);")
+        disable_index = content.index("setControlsDisabled(true);")
+        send_index = content.index("xhr.send(formData);")
+        self.assertLess(set_progress_index, form_data_index)
+        self.assertLess(form_data_index, disable_index)
+        self.assertLess(disable_index, send_index)
+        self.assertNotIn("xhr.send(new FormData(form));", content)
+
     def test_admin_upload_endpoint_saves_file_with_configured_download_name(self):
         from tempfile import TemporaryDirectory
 

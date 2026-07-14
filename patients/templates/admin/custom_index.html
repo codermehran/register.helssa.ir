@@ -91,6 +91,7 @@
         status.hidden = false;
         message.textContent = "در حال آپلود و آماده‌سازی فایل APK...";
         setProgress(0);
+        const formData = new FormData(form);
         setControlsDisabled(true);
 
         const xhr = new XMLHttpRequest();
@@ -128,7 +129,7 @@
           message.textContent = "ارتباط با سرور هنگام آپلود قطع شد. لطفاً دوباره تلاش کنید.";
         };
 
-        xhr.send(new FormData(form));
+        xhr.send(formData);
       });
     })();
   </script>
