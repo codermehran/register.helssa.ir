@@ -1,14 +1,17 @@
 import json
 from io import BytesIO
 
+import qrcode
+import qrcode.image.svg
 from django.conf import settings
 from django.contrib import messages
 from django.db import DatabaseError, IntegrityError, transaction
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.templatetags.static import static
+from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_POST, require_safe
 
 from .forms import (
     DUPLICATE_MOBILE_ERROR,
@@ -72,10 +75,10 @@ def _absolute_static_url(request, path):
 def get_apk_download_url(request):
     """Build the public APK download URL used by links and QR codes."""
 
-    return request.build_absolute_uri(f"/down/{APK_DOWNLOAD_FILENAME}")
+    return request.build_absolute_uri(reverse("patients:download_helssa_apk"))
 
 
-@require_GET
+@require_safe
 def download_helssa_apk(request):
     """Serve the Helssa Android APK and log successful download requests."""
 
@@ -103,15 +106,9 @@ def download_helssa_apk(request):
     return response
 
 
-@require_GET
+@require_safe
 def helssa_apk_qr_svg(request):
     """Return an SVG QR code that points to the APK download URL."""
-
-    try:
-        import qrcode
-        import qrcode.image.svg
-    except ImportError as exc:
-        raise Http404("کتابخانه ساخت QR code نصب نشده است.") from exc
 
     image = qrcode.make(
         get_apk_download_url(request),
@@ -124,6 +121,7 @@ def helssa_apk_qr_svg(request):
     return HttpResponse(
         output.getvalue(), content_type="image/svg+xml; charset=utf-8"
     )
+
 
 def robots_txt(request):
     """Serve crawl instructions for search engines."""
@@ -292,7 +290,9 @@ def register_patient(request):
             "apk_download": {
                 "url": get_apk_download_url(request),
                 "filename": APK_DOWNLOAD_FILENAME,
-                "qr_url": request.build_absolute_uri("/down/helssa-qr.svg"),
+                "qr_url": request.build_absolute_uri(
+                    reverse("patients:helssa_apk_qr_svg")
+                ),
             },
             "structured_data_json": json.dumps(
                 structured_data, ensure_ascii=False

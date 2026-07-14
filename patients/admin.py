@@ -191,6 +191,7 @@ def build_visit_events_pdf(events, summary, start_datetime, end_datetime):
             ("تلاش ثبت‌نام", summary["submit_attempts"]),
             ("ثبت‌نام موفق", summary["successful_registrations"]),
             ("ثبت‌نام ناموفق", summary["invalid_submits"] + summary["error_submits"]),
+            ("دانلود اپلیکیشن", summary["apk_downloads"]),
         )
     ]
     story.append(
