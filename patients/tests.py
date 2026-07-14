@@ -1,4 +1,5 @@
 import json
+import zipfile
 from datetime import datetime, timezone as datetime_timezone
 from io import BytesIO
 from pathlib import Path
@@ -55,6 +56,14 @@ from .sms import (
     send_done_sms,
     send_register_sms,
 )
+
+
+def build_minimal_apk_bytes(extra_content=b"classes"):
+    output = BytesIO()
+    with zipfile.ZipFile(output, "w") as apk_zip:
+        apk_zip.writestr("AndroidManifest.xml", b"manifest")
+        apk_zip.writestr("classes.dex", extra_content)
+    return output.getvalue()
 
 
 def register_test_pdf_fonts():
@@ -1927,7 +1936,7 @@ class ApkDownloadTests(TestCase):
             apk_path = download_dir / "helssa.apk"
             uploaded_file = SimpleUploadedFile(
                 "release-v9.apk",
-                b"uploaded-apk",
+                build_minimal_apk_bytes(b"uploaded-apk"),
                 content_type="application/vnd.android.package-archive",
             )
             with override_settings(
@@ -1943,7 +1952,7 @@ class ApkDownloadTests(TestCase):
 
                 self.assertRedirects(response, reverse("admin:index"))
                 self.assertTrue(apk_path.exists())
-                self.assertEqual(apk_path.read_bytes(), b"uploaded-apk")
+                self.assertIn(b"AndroidManifest.xml", apk_path.read_bytes())
                 self.assertFalse((download_dir / "release-v9.apk").exists())
                 download_response = self.client.get(
                     reverse("admin_download_helssa_apk")
@@ -1951,7 +1960,9 @@ class ApkDownloadTests(TestCase):
 
         self.assertEqual(download_response.status_code, 200)
         self.assertIn("helssa.apk", download_response["Content-Disposition"])
-        self.assertEqual(b"".join(download_response.streaming_content), b"uploaded-apk")
+        self.assertIn(
+            b"AndroidManifest.xml", b"".join(download_response.streaming_content)
+        )
 
     def test_admin_upload_endpoint_rejects_non_apk_file(self):
         from tempfile import TemporaryDirectory
@@ -1983,6 +1994,48 @@ class ApkDownloadTests(TestCase):
         messages = [message.message for message in get_messages(response.wsgi_request)]
         self.assertIn("فقط فایل با پسوند APK قابل آپلود است.", messages)
 
+    def test_admin_upload_endpoint_rejects_non_zip_apk_without_overwriting_existing_file(self):
+        from tempfile import TemporaryDirectory
+
+        user = get_user_model().objects.create_superuser(
+            username="apk-upload-structure-validator",
+            email="apk-upload-structure-validator@example.com",
+            password="password",
+        )
+        self.client.force_login(user)
+
+        with TemporaryDirectory() as tmpdir:
+            download_dir = Path(tmpdir)
+            apk_path = download_dir / "helssa.apk"
+            apk_path.write_bytes(b"previous-apk")
+            uploaded_file = SimpleUploadedFile(
+                "invalid-release.apk",
+                b"not-a-zip-file",
+                content_type="application/vnd.android.package-archive",
+            )
+            with override_settings(
+                APK_DOWNLOAD_PATH=apk_path,
+                APK_DOWNLOAD_DIR=download_dir,
+                APK_UPLOAD_FINALIZE_SYNCHRONOUS=True,
+            ):
+                response = self.client.post(
+                    reverse("admin_upload_helssa_apk"),
+                    {"apk_file": uploaded_file},
+                    follow=True,
+                )
+
+                self.assertEqual(apk_path.read_bytes(), b"previous-apk")
+                self.assertEqual(
+                    list((download_dir / "tmp").glob("apk-upload-*.apk")), []
+                )
+
+        self.assertRedirects(response, reverse("admin:index"))
+        messages = [message.message for message in get_messages(response.wsgi_request)]
+        self.assertIn("فایل انتخاب‌شده APK معتبر نیست.", messages)
+        job = APKUploadJob.objects.get()
+        self.assertEqual(job.status, APKUploadJob.STATUS_FAILED)
+        self.assertEqual(job.error_message, "فایل انتخاب‌شده APK معتبر نیست.")
+
     def test_admin_ajax_upload_endpoint_returns_json_success(self):
         from tempfile import TemporaryDirectory
 
@@ -1998,7 +2051,7 @@ class ApkDownloadTests(TestCase):
             apk_path = download_dir / "helssa.apk"
             uploaded_file = SimpleUploadedFile(
                 "release-v10.apk",
-                b"ajax-uploaded-apk",
+                build_minimal_apk_bytes(b"ajax-uploaded-apk"),
                 content_type="application/vnd.android.package-archive",
             )
             with override_settings(
@@ -2018,7 +2071,7 @@ class ApkDownloadTests(TestCase):
                 self.assertIn("در صف آماده‌سازی", response.json()["message"])
                 self.assertIn("status_url", response.json())
                 self.assertTrue(apk_path.exists())
-                self.assertEqual(apk_path.read_bytes(), b"ajax-uploaded-apk")
+                self.assertIn(b"AndroidManifest.xml", apk_path.read_bytes())
 
     def test_admin_ajax_upload_endpoint_returns_json_error_for_invalid_file(self):
         from tempfile import TemporaryDirectory
@@ -2065,7 +2118,7 @@ class ApkDownloadTests(TestCase):
             apk_path = download_dir / "helssa.apk"
             uploaded_file = SimpleUploadedFile(
                 "release-job.apk",
-                b"queued-apk",
+                build_minimal_apk_bytes(b"queued-apk"),
                 content_type="application/vnd.android.package-archive",
             )
             with override_settings(
@@ -2083,7 +2136,9 @@ class ApkDownloadTests(TestCase):
                 job = APKUploadJob.objects.get()
                 self.assertEqual(job.status, APKUploadJob.STATUS_QUEUED)
                 self.assertEqual(job.original_filename, "release-job.apk")
-                self.assertEqual(Path(job.stored_path).read_bytes(), b"queued-apk")
+                self.assertIn(
+                    b"AndroidManifest.xml", Path(job.stored_path).read_bytes()
+                )
                 self.assertEqual(Path(job.stored_path).parent.name, "tmp")
                 self.assertFalse(apk_path.exists())
                 finalizer.assert_not_called()
@@ -2166,7 +2221,7 @@ class ApkDownloadTests(TestCase):
             download_dir = Path(tmpdir)
             uploaded_file = SimpleUploadedFile(
                 "release.apk",
-                b"apk-content",
+                build_minimal_apk_bytes(b"apk-content"),
                 content_type="application/vnd.android.package-archive",
             )
             with override_settings(
