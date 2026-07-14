@@ -1899,7 +1899,17 @@ class ApkDownloadTests(TestCase):
 
         self.assertContains(response, "آپلود فایل APK جدید")
         self.assertContains(response, reverse("admin_upload_helssa_apk"))
+        self.assertContains(response, 'id="helssa-apk-upload-form"')
         self.assertContains(response, 'name="apk_file"')
+        self.assertContains(response, 'id="helssa-apk-upload-status"')
+        self.assertContains(response, 'role="progressbar"')
+        self.assertContains(response, 'aria-valuenow="0"')
+        self.assertContains(response, "در حال آپلود...")
+        self.assertContains(response, "لطفاً تا پایان آپلود صفحه را نبندید")
+        self.assertContains(response, "XMLHttpRequest")
+        self.assertContains(response, "xhr.upload.onprogress")
+        self.assertContains(response, "آپلود فایل APK با موفقیت انجام شد")
+        self.assertContains(response, "آپلود فایل APK ناموفق بود")
 
     def test_admin_upload_endpoint_saves_file_with_configured_download_name(self):
         from tempfile import TemporaryDirectory
@@ -1969,6 +1979,71 @@ class ApkDownloadTests(TestCase):
         self.assertFalse(apk_path.exists())
         messages = [message.message for message in get_messages(response.wsgi_request)]
         self.assertIn("فقط فایل با پسوند APK قابل آپلود است.", messages)
+
+    def test_admin_ajax_upload_endpoint_returns_json_success(self):
+        from tempfile import TemporaryDirectory
+
+        user = get_user_model().objects.create_superuser(
+            username="apk-ajax-uploader",
+            email="apk-ajax-uploader@example.com",
+            password="password",
+        )
+        self.client.force_login(user)
+
+        with TemporaryDirectory() as tmpdir:
+            download_dir = Path(tmpdir)
+            apk_path = download_dir / "helssa.apk"
+            uploaded_file = SimpleUploadedFile(
+                "release-v10.apk",
+                b"ajax-uploaded-apk",
+                content_type="application/vnd.android.package-archive",
+            )
+            with override_settings(
+                APK_DOWNLOAD_PATH=apk_path,
+                APK_DOWNLOAD_DIR=download_dir,
+            ):
+                response = self.client.post(
+                    reverse("admin_upload_helssa_apk"),
+                    {"apk_file": uploaded_file},
+                    HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response["Content-Type"], "application/json")
+                self.assertEqual(response.json()["redirect_url"], reverse("admin:index"))
+                self.assertIn("ذخیره شد", response.json()["message"])
+                self.assertTrue(apk_path.exists())
+                self.assertEqual(apk_path.read_bytes(), b"ajax-uploaded-apk")
+
+    def test_admin_ajax_upload_endpoint_returns_json_error_for_invalid_file(self):
+        from tempfile import TemporaryDirectory
+
+        user = get_user_model().objects.create_superuser(
+            username="apk-ajax-validator",
+            email="apk-ajax-validator@example.com",
+            password="password",
+        )
+        self.client.force_login(user)
+
+        with TemporaryDirectory() as tmpdir:
+            download_dir = Path(tmpdir)
+            apk_path = download_dir / "helssa.apk"
+            uploaded_file = SimpleUploadedFile("notes.txt", b"not-apk")
+            with override_settings(
+                APK_DOWNLOAD_PATH=apk_path,
+                APK_DOWNLOAD_DIR=download_dir,
+            ):
+                response = self.client.post(
+                    reverse("admin_upload_helssa_apk"),
+                    {"apk_file": uploaded_file},
+                    HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response["Content-Type"], "application/json")
+        self.assertFalse(response.json()["ok"])
+        self.assertEqual(response.json()["message"], "فقط فایل با پسوند APK قابل آپلود است.")
+        self.assertFalse(apk_path.exists())
 
     def test_admin_download_endpoint_serves_apk_with_actual_filename(self):
         from tempfile import TemporaryDirectory
