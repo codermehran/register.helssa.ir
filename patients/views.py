@@ -161,13 +161,21 @@ def admin_download_helssa_apk(request):
 def admin_upload_helssa_apk(request):
     """Store an uploaded APK at the exact path served by the download endpoint."""
 
+    is_ajax_upload = request.headers.get("x-requested-with") == "XMLHttpRequest"
+
     uploaded_file = request.FILES.get("apk_file")
     if not uploaded_file:
-        messages.error(request, "لطفاً یک فایل APK برای آپلود انتخاب کنید.")
+        error_message = "لطفاً یک فایل APK برای آپلود انتخاب کنید."
+        if is_ajax_upload:
+            return JsonResponse({"ok": False, "message": error_message}, status=400)
+        messages.error(request, error_message)
         return HttpResponseRedirect(reverse("admin:index"))
 
     if not uploaded_file.name.lower().endswith(".apk"):
-        messages.error(request, "فقط فایل با پسوند APK قابل آپلود است.")
+        error_message = "فقط فایل با پسوند APK قابل آپلود است."
+        if is_ajax_upload:
+            return JsonResponse({"ok": False, "message": error_message}, status=400)
+        messages.error(request, error_message)
         return HttpResponseRedirect(reverse("admin:index"))
 
     apk_path = get_configured_apk_download_path()
@@ -176,10 +184,15 @@ def admin_upload_helssa_apk(request):
         for chunk in uploaded_file.chunks():
             destination.write(chunk)
 
-    messages.success(
-        request,
-        f"فایل اپلیکیشن با نام {apk_path.name} ذخیره شد و از لینک دانلود فعلی در دسترس است.",
+    success_message = (
+        f"فایل اپلیکیشن با نام {apk_path.name} ذخیره شد و از لینک دانلود فعلی در دسترس است."
     )
+    if is_ajax_upload:
+        return JsonResponse(
+            {"ok": True, "message": success_message, "redirect_url": reverse("admin:index")}
+        )
+
+    messages.success(request, success_message)
     return HttpResponseRedirect(reverse("admin:index"))
 
 
