@@ -1,4 +1,7 @@
 import json
+import shutil
+import tempfile
+import threading
 from io import BytesIO
 from pathlib import Path
 
@@ -27,7 +30,7 @@ from .forms import (
     PatientRegistrationForm,
 )
 from .analytics import log_visit_event
-from .models import Patient, VisitEvent
+from .models import APKUploadJob, Patient, VisitEvent
 
 SUCCESS_MESSAGE = (
     "ثبت‌نام شما با موفقیت انجام شد. درمانگاه برای تکمیل فرآیند با شما تماس می‌گیرد."
@@ -156,10 +159,77 @@ def admin_download_helssa_apk(request):
     return _serve_apk_file(request)
 
 
+def _apk_upload_status_payload(job):
+    return {
+        "id": job.pk,
+        "status": job.status,
+        "status_label": job.get_status_display(),
+        "original_filename": job.original_filename,
+        "error_message": job.error_message,
+        "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+    }
+
+
+def _finalize_apk_upload_job(job_id):
+    try:
+        job = APKUploadJob.objects.get(pk=job_id)
+        job.status = APKUploadJob.STATUS_PREPARING
+        job.error_message = ""
+        job.save(update_fields=["status", "error_message"])
+
+        temp_path = Path(job.stored_path)
+        if (
+            not temp_path.exists()
+            or not temp_path.is_file()
+            or temp_path.stat().st_size == 0
+        ):
+            raise ValueError("فایل آپلودشده ناقص است یا روی سرور پیدا نشد.")
+        if temp_path.suffix.lower() != ".apk":
+            raise ValueError("فقط فایل با پسوند APK قابل آپلود است.")
+
+        apk_path = get_configured_apk_download_path()
+        apk_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(temp_path), str(apk_path))
+
+        job.status = APKUploadJob.STATUS_COMPLETED
+        job.stored_path = str(apk_path)
+        job.finished_at = timezone.now()
+        job.save(update_fields=["status", "stored_path", "finished_at"])
+    except Exception as exc:
+        APKUploadJob.objects.filter(pk=job_id).update(
+            status=APKUploadJob.STATUS_FAILED,
+            error_message=str(exc),
+            finished_at=timezone.now(),
+        )
+
+
+def _start_apk_upload_finalizer(job_id):
+    if getattr(settings, "APK_UPLOAD_FINALIZE_SYNCHRONOUS", False):
+        _finalize_apk_upload_job(job_id)
+        return
+
+    thread = threading.Thread(
+        target=_finalize_apk_upload_job, args=(job_id,), daemon=True
+    )
+    thread.start()
+
+
+def _save_uploaded_apk_to_temp(uploaded_file):
+    download_dir = Path(getattr(settings, "APK_DOWNLOAD_DIR", APK_DOWNLOAD_DIR))
+    temp_dir = download_dir / "tmp"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        mode="wb", suffix=".apk", prefix="apk-upload-", dir=temp_dir, delete=False
+    ) as destination:
+        for chunk in uploaded_file.chunks():
+            destination.write(chunk)
+        return Path(destination.name)
+
+
 @staff_member_required
 @require_POST
 def admin_upload_helssa_apk(request):
-    """Store an uploaded APK at the exact path served by the download endpoint."""
+    """Create an APK upload job, store the file temporarily, then finalize it."""
 
     is_ajax_upload = request.headers.get("x-requested-with") == "XMLHttpRequest"
 
@@ -178,22 +248,47 @@ def admin_upload_helssa_apk(request):
         messages.error(request, error_message)
         return HttpResponseRedirect(reverse("admin:index"))
 
-    apk_path = get_configured_apk_download_path()
-    apk_path.parent.mkdir(parents=True, exist_ok=True)
-    with apk_path.open("wb") as destination:
-        for chunk in uploaded_file.chunks():
-            destination.write(chunk)
-
-    success_message = (
-        f"فایل اپلیکیشن با نام {apk_path.name} ذخیره شد و از لینک دانلود فعلی در دسترس است."
+    job = APKUploadJob.objects.create(
+        status=APKUploadJob.STATUS_UPLOADING,
+        original_filename=Path(uploaded_file.name).name,
+        created_by=request.user if request.user.is_authenticated else None,
     )
+    temp_path = _save_uploaded_apk_to_temp(uploaded_file)
+    job.status = APKUploadJob.STATUS_QUEUED
+    job.stored_path = str(temp_path)
+    job.save(update_fields=["status", "stored_path"])
+    if getattr(settings, "APK_UPLOAD_FINALIZE_SYNCHRONOUS", False):
+        _start_apk_upload_finalizer(job.pk)
+    else:
+        transaction.on_commit(lambda: _start_apk_upload_finalizer(job.pk))
+
+    success_message = "فایل APK دریافت شد و در صف آماده‌سازی قرار گرفت."
     if is_ajax_upload:
         return JsonResponse(
-            {"ok": True, "message": success_message, "redirect_url": reverse("admin:index")}
+            {
+                "ok": True,
+                "message": success_message,
+                "job": _apk_upload_status_payload(job),
+                "status_url": reverse("admin_apk_upload_status", args=[job.pk]),
+                "redirect_url": reverse("admin:index"),
+            }
         )
 
     messages.success(request, success_message)
     return HttpResponseRedirect(reverse("admin:index"))
+
+
+@staff_member_required
+@require_GET
+def admin_apk_upload_status(request, job_id):
+    try:
+        job = APKUploadJob.objects.get(pk=job_id)
+    except APKUploadJob.DoesNotExist:
+        return JsonResponse(
+            {"ok": False, "message": "عملیات آپلود پیدا نشد."}, status=404
+        )
+
+    return JsonResponse({"ok": True, "job": _apk_upload_status_payload(job)})
 
 
 @require_safe

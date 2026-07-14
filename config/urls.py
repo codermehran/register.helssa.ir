@@ -19,7 +19,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 
-from patients.views import admin_download_helssa_apk, admin_upload_helssa_apk
+from patients.views import (
+    admin_apk_upload_status,
+    admin_download_helssa_apk,
+    admin_upload_helssa_apk,
+)
 
 admin.site.index_template = "admin/custom_index.html"
 
@@ -33,6 +37,11 @@ urlpatterns = [
         "admin/upload-helssa-apk/",
         admin_upload_helssa_apk,
         name="admin_upload_helssa_apk",
+    ),
+    path(
+        "admin/upload-helssa-apk/<int:job_id>/status/",
+        admin_apk_upload_status,
+        name="admin_apk_upload_status",
     ),
     path("admin/", admin.site.urls),
     path("", include("patients.urls")),

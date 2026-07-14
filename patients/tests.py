@@ -47,7 +47,7 @@ from .views import (
     SITE_NAME,
     SUCCESS_MESSAGE,
 )
-from .models import SMSMessageLog, Patient, VisitEvent
+from .models import APKUploadJob, SMSMessageLog, Patient, VisitEvent
 from .sms import (
     KavenegarSMSDeliveryError,
     KavenegarSMSConfigurationError,
@@ -1905,10 +1905,11 @@ class ApkDownloadTests(TestCase):
         self.assertContains(response, 'role="progressbar"')
         self.assertContains(response, 'aria-valuenow="0"')
         self.assertContains(response, "در حال آپلود...")
-        self.assertContains(response, "لطفاً تا پایان آپلود صفحه را نبندید")
+        self.assertContains(response, "پس از تکمیل آپلود، آماده‌سازی در پس‌زمینه ادامه پیدا می‌کند")
         self.assertContains(response, "XMLHttpRequest")
         self.assertContains(response, "xhr.upload.onprogress")
-        self.assertContains(response, "آپلود فایل APK با موفقیت انجام شد")
+        self.assertContains(response, "فایل APK دریافت شد. در حال آماده‌سازی")
+        self.assertContains(response, "fetch(statusUrl")
         self.assertContains(response, "آپلود فایل APK ناموفق بود")
 
     def test_admin_upload_endpoint_saves_file_with_configured_download_name(self):
@@ -1932,6 +1933,7 @@ class ApkDownloadTests(TestCase):
             with override_settings(
                 APK_DOWNLOAD_PATH=apk_path,
                 APK_DOWNLOAD_DIR=download_dir,
+                APK_UPLOAD_FINALIZE_SYNCHRONOUS=True,
             ):
                 response = self.client.post(
                     reverse("admin_upload_helssa_apk"),
@@ -1968,6 +1970,7 @@ class ApkDownloadTests(TestCase):
             with override_settings(
                 APK_DOWNLOAD_PATH=apk_path,
                 APK_DOWNLOAD_DIR=download_dir,
+                APK_UPLOAD_FINALIZE_SYNCHRONOUS=True,
             ):
                 response = self.client.post(
                     reverse("admin_upload_helssa_apk"),
@@ -2001,6 +2004,7 @@ class ApkDownloadTests(TestCase):
             with override_settings(
                 APK_DOWNLOAD_PATH=apk_path,
                 APK_DOWNLOAD_DIR=download_dir,
+                APK_UPLOAD_FINALIZE_SYNCHRONOUS=True,
             ):
                 response = self.client.post(
                     reverse("admin_upload_helssa_apk"),
@@ -2011,7 +2015,8 @@ class ApkDownloadTests(TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response["Content-Type"], "application/json")
                 self.assertEqual(response.json()["redirect_url"], reverse("admin:index"))
-                self.assertIn("ذخیره شد", response.json()["message"])
+                self.assertIn("در صف آماده‌سازی", response.json()["message"])
+                self.assertIn("status_url", response.json())
                 self.assertTrue(apk_path.exists())
                 self.assertEqual(apk_path.read_bytes(), b"ajax-uploaded-apk")
 
@@ -2044,6 +2049,85 @@ class ApkDownloadTests(TestCase):
         self.assertFalse(response.json()["ok"])
         self.assertEqual(response.json()["message"], "فقط فایل با پسوند APK قابل آپلود است.")
         self.assertFalse(apk_path.exists())
+
+    def test_admin_upload_endpoint_creates_job_and_temp_file_before_finalizing(self):
+        from tempfile import TemporaryDirectory
+
+        user = get_user_model().objects.create_superuser(
+            username="apk-job-uploader",
+            email="apk-job-uploader@example.com",
+            password="password",
+        )
+        self.client.force_login(user)
+
+        with TemporaryDirectory() as tmpdir:
+            download_dir = Path(tmpdir)
+            apk_path = download_dir / "helssa.apk"
+            uploaded_file = SimpleUploadedFile(
+                "release-job.apk",
+                b"queued-apk",
+                content_type="application/vnd.android.package-archive",
+            )
+            with override_settings(
+                APK_DOWNLOAD_PATH=apk_path,
+                APK_DOWNLOAD_DIR=download_dir,
+                APK_UPLOAD_FINALIZE_SYNCHRONOUS=False,
+            ), patch("patients.views._start_apk_upload_finalizer") as finalizer:
+                response = self.client.post(
+                    reverse("admin_upload_helssa_apk"),
+                    {"apk_file": uploaded_file},
+                    HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                )
+
+                self.assertEqual(response.status_code, 200)
+                job = APKUploadJob.objects.get()
+                self.assertEqual(job.status, APKUploadJob.STATUS_QUEUED)
+                self.assertEqual(job.original_filename, "release-job.apk")
+                self.assertEqual(Path(job.stored_path).read_bytes(), b"queued-apk")
+                self.assertEqual(Path(job.stored_path).parent.name, "tmp")
+                self.assertFalse(apk_path.exists())
+                finalizer.assert_not_called()
+
+    def test_admin_upload_status_endpoint_returns_job_json(self):
+        user = get_user_model().objects.create_superuser(
+            username="apk-status-admin",
+            email="apk-status-admin@example.com",
+            password="password",
+        )
+        self.client.force_login(user)
+        job = APKUploadJob.objects.create(
+            status=APKUploadJob.STATUS_PREPARING,
+            original_filename="release.apk",
+            created_by=user,
+        )
+
+        response = self.client.get(reverse("admin_apk_upload_status", args=[job.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["job"]["status"], APKUploadJob.STATUS_PREPARING)
+        self.assertEqual(payload["job"]["status_label"], "در حال آماده‌سازی")
+
+    def test_finalize_apk_upload_job_marks_missing_temp_file_failed(self):
+        from tempfile import TemporaryDirectory
+        from patients.views import _finalize_apk_upload_job
+
+        with TemporaryDirectory() as tmpdir:
+            job = APKUploadJob.objects.create(
+                status=APKUploadJob.STATUS_QUEUED,
+                original_filename="missing.apk",
+                stored_path=str(Path(tmpdir) / "missing.apk"),
+            )
+            with override_settings(
+                APK_DOWNLOAD_PATH=Path(tmpdir) / "helssa.apk",
+                APK_DOWNLOAD_DIR=Path(tmpdir),
+            ):
+                _finalize_apk_upload_job(job.pk)
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, APKUploadJob.STATUS_FAILED)
+        self.assertIn("ناقص", job.error_message)
 
     def test_admin_download_endpoint_serves_apk_with_actual_filename(self):
         from tempfile import TemporaryDirectory
