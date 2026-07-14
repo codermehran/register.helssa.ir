@@ -1,7 +1,7 @@
 import json
-import shutil
 import tempfile
 import threading
+import zipfile
 from io import BytesIO
 from pathlib import Path
 
@@ -187,11 +187,11 @@ def _finalize_apk_upload_job(job_id):
         if temp_path.suffix.lower() != ".apk":
             raise ValueError("فقط فایل با پسوند APK قابل آپلود است.")
 
+        _validate_apk_file(temp_path)
+
         apk_path = get_configured_apk_download_path()
         apk_path.parent.mkdir(parents=True, exist_ok=True)
-        temp_dest = apk_path.with_name(f"{apk_path.name}.tmp")
-        shutil.move(str(temp_path), str(temp_dest))
-        temp_dest.replace(apk_path)
+        temp_path.replace(apk_path)
 
         job.status = APKUploadJob.STATUS_COMPLETED
         job.stored_path = str(apk_path)
@@ -211,6 +211,22 @@ def _finalize_apk_upload_job(job_id):
             error_message=str(exc),
             finished_at=timezone.now(),
         )
+
+
+def _validate_apk_file(path):
+    """Validate that the temporary upload has the basic ZIP/APK structure."""
+
+    invalid_message = "فایل انتخاب‌شده APK معتبر نیست."
+    if not zipfile.is_zipfile(path):
+        raise ValueError(invalid_message)
+
+    try:
+        with zipfile.ZipFile(path) as apk_zip:
+            names = set(apk_zip.namelist())
+            if "AndroidManifest.xml" not in names:
+                raise ValueError(invalid_message)
+    except zipfile.BadZipFile as exc:
+        raise ValueError(invalid_message) from exc
 
 
 def _start_apk_upload_finalizer(job_id):
@@ -294,8 +310,16 @@ def admin_upload_helssa_apk(request):
     job.status = APKUploadJob.STATUS_QUEUED
     job.stored_path = str(temp_path)
     job.save(update_fields=["status", "stored_path"])
-    if getattr(settings, "APK_UPLOAD_FINALIZE_SYNCHRONOUS", False):
+    finalize_synchronously = getattr(settings, "APK_UPLOAD_FINALIZE_SYNCHRONOUS", False)
+    if finalize_synchronously:
         _start_apk_upload_finalizer(job.pk)
+        job.refresh_from_db(fields=["status", "error_message", "finished_at"])
+        if job.status == APKUploadJob.STATUS_FAILED:
+            error_message = job.error_message or "فایل انتخاب‌شده APK معتبر نیست."
+            if is_ajax_upload:
+                return JsonResponse({"ok": False, "message": error_message}, status=400)
+            messages.error(request, error_message)
+            return HttpResponseRedirect(reverse("admin:index"))
     else:
         transaction.on_commit(lambda: _start_apk_upload_finalizer(job.pk))
 
