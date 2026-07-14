@@ -849,6 +849,7 @@ class VisitReportAdmin(admin.ModelAdmin):
             ("مشاهده فرم", to_persian_digits(summary["form_views"])),
             ("تلاش ثبت‌نام", to_persian_digits(summary["submit_attempts"])),
             ("ثبت‌نام موفق", to_persian_digits(summary["successful_registrations"])),
+            ("دانلود اپلیکیشن", to_persian_digits(summary["apk_downloads"])),
             (
                 "ثبت‌نام ناموفق",
                 to_persian_digits(

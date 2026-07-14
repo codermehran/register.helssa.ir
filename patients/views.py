@@ -1,13 +1,14 @@
 import json
+from io import BytesIO
 
 from django.conf import settings
 from django.contrib import messages
 from django.db import DatabaseError, IntegrityError, transaction
-from django.http import HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.templatetags.static import static
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from .forms import (
     DUPLICATE_MOBILE_ERROR,
@@ -32,6 +33,8 @@ SHARE_DESCRIPTION = (
 SHARE_IMAGE_PATH = "patients/images/share-logo.png"
 SITE_LOGO_PATH = "patients/images/site-logo.png"
 COMMUNITY_BASE_COUNT = 1008
+APK_DOWNLOAD_FILENAME = "helssa.apk"
+APK_DOWNLOAD_PATH = settings.BASE_DIR / "down" / APK_DOWNLOAD_FILENAME
 ENGAGEMENT_EVENT_TYPES = {
     VisitEvent.EVENT_HERO_CTA_CLICK,
     VisitEvent.EVENT_STICKY_CTA_CLICK,
@@ -65,6 +68,62 @@ def _absolute_static_url(request, path):
 
     return request.build_absolute_uri(static_url)
 
+
+def get_apk_download_url(request):
+    """Build the public APK download URL used by links and QR codes."""
+
+    return request.build_absolute_uri(f"/down/{APK_DOWNLOAD_FILENAME}")
+
+
+@require_GET
+def download_helssa_apk(request):
+    """Serve the Helssa Android APK and log successful download requests."""
+
+    if not APK_DOWNLOAD_PATH.exists() or not APK_DOWNLOAD_PATH.is_file():
+        _log_analytics(
+            request,
+            VisitEvent.EVENT_APK_DOWNLOAD,
+            metadata={"filename": APK_DOWNLOAD_FILENAME, "result": "missing"},
+            status_code=404,
+        )
+        raise Http404("فایل اپلیکیشن هنوز روی سرور قرار نگرفته است.")
+
+    response = FileResponse(
+        APK_DOWNLOAD_PATH.open("rb"),
+        as_attachment=True,
+        filename=APK_DOWNLOAD_FILENAME,
+        content_type="application/vnd.android.package-archive",
+    )
+    _log_analytics(
+        request,
+        VisitEvent.EVENT_APK_DOWNLOAD,
+        response=response,
+        metadata={"filename": APK_DOWNLOAD_FILENAME, "result": "download"},
+    )
+    return response
+
+
+@require_GET
+def helssa_apk_qr_svg(request):
+    """Return an SVG QR code that points to the APK download URL."""
+
+    try:
+        import qrcode
+        import qrcode.image.svg
+    except ImportError as exc:
+        raise Http404("کتابخانه ساخت QR code نصب نشده است.") from exc
+
+    image = qrcode.make(
+        get_apk_download_url(request),
+        image_factory=qrcode.image.svg.SvgPathImage,
+        box_size=12,
+        border=2,
+    )
+    output = BytesIO()
+    image.save(output)
+    return HttpResponse(
+        output.getvalue(), content_type="image/svg+xml; charset=utf-8"
+    )
 
 def robots_txt(request):
     """Serve crawl instructions for search engines."""
@@ -230,6 +289,11 @@ def register_patient(request):
             "share_meta": share_meta,
             "site_logo": site_logo,
             "stats": stats,
+            "apk_download": {
+                "url": get_apk_download_url(request),
+                "filename": APK_DOWNLOAD_FILENAME,
+                "qr_url": request.build_absolute_uri("/down/helssa-qr.svg"),
+            },
             "structured_data_json": json.dumps(
                 structured_data, ensure_ascii=False
             ).replace("</", "<\\/"),
