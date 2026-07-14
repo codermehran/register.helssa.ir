@@ -48,6 +48,52 @@ class SMSMessageLog(models.Model):
     def __str__(self):
         return f"{self.patient} - {self.template} - {self.get_status_display()}"
 
+
+class APKUploadJob(models.Model):
+    STATUS_QUEUED = "queued"
+    STATUS_UPLOADING = "uploading"
+    STATUS_PREPARING = "preparing"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
+
+    STATUS_CHOICES = (
+        (STATUS_QUEUED, "در صف"),
+        (STATUS_UPLOADING, "در حال آپلود"),
+        (STATUS_PREPARING, "در حال آماده‌سازی"),
+        (STATUS_COMPLETED, "تکمیل شد"),
+        (STATUS_FAILED, "ناموفق"),
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_QUEUED,
+        db_index=True,
+        verbose_name="وضعیت",
+    )
+    original_filename = models.CharField(max_length=255, verbose_name="نام فایل اصلی")
+    stored_path = models.TextField(blank=True, verbose_name="مسیر ذخیره موقت")
+    error_message = models.TextField(blank=True, verbose_name="پیام خطا")
+    created_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="apk_upload_jobs",
+        verbose_name="ایجادکننده",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="زمان ایجاد")
+    finished_at = models.DateTimeField(null=True, blank=True, verbose_name="زمان پایان")
+
+    class Meta:
+        ordering = ("-created_at",)
+        verbose_name = "عملیات آپلود APK"
+        verbose_name_plural = "عملیات‌های آپلود APK"
+
+    def __str__(self):
+        return f"{self.original_filename} - {self.get_status_display()}"
+
+
 class VisitEvent(models.Model):
     EVENT_PAGE_VIEW = "page_view"
     EVENT_FORM_VIEW = "form_view"
