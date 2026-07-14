@@ -2129,6 +2129,86 @@ class ApkDownloadTests(TestCase):
         self.assertEqual(job.status, APKUploadJob.STATUS_FAILED)
         self.assertIn("ناقص", job.error_message)
 
+    def test_finalize_apk_upload_job_removes_temp_file_on_failure(self):
+        from tempfile import TemporaryDirectory
+        from patients.views import _finalize_apk_upload_job
+
+        with TemporaryDirectory() as tmpdir:
+            temp_path = Path(tmpdir) / "bad.apk"
+            temp_path.write_bytes(b"")
+            job = APKUploadJob.objects.create(
+                status=APKUploadJob.STATUS_QUEUED,
+                original_filename="bad.apk",
+                stored_path=str(temp_path),
+            )
+            with override_settings(
+                APK_DOWNLOAD_PATH=Path(tmpdir) / "helssa.apk",
+                APK_DOWNLOAD_DIR=Path(tmpdir),
+            ):
+                _finalize_apk_upload_job(job.pk)
+
+            self.assertFalse(temp_path.exists())
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, APKUploadJob.STATUS_FAILED)
+
+    def test_admin_upload_marks_job_failed_when_temp_save_fails(self):
+        from tempfile import TemporaryDirectory
+
+        user = get_user_model().objects.create_superuser(
+            username="apk-save-fail-admin",
+            email="apk-save-fail-admin@example.com",
+            password="password",
+        )
+        self.client.force_login(user)
+
+        with TemporaryDirectory() as tmpdir:
+            download_dir = Path(tmpdir)
+            uploaded_file = SimpleUploadedFile(
+                "release.apk",
+                b"apk-content",
+                content_type="application/vnd.android.package-archive",
+            )
+            with override_settings(
+                APK_DOWNLOAD_PATH=download_dir / "helssa.apk",
+                APK_DOWNLOAD_DIR=download_dir,
+            ), patch(
+                "patients.views._save_uploaded_apk_to_temp",
+                side_effect=OSError("disk full"),
+            ):
+                response = self.client.post(
+                    reverse("admin_upload_helssa_apk"),
+                    {"apk_file": uploaded_file},
+                    HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertFalse(response.json()["ok"])
+        job = APKUploadJob.objects.get()
+        self.assertEqual(job.status, APKUploadJob.STATUS_FAILED)
+        self.assertIn("disk full", job.error_message)
+
+    def test_save_uploaded_apk_to_temp_deletes_partial_file_on_write_error(self):
+        from tempfile import TemporaryDirectory
+        from patients.views import _save_uploaded_apk_to_temp
+
+        class FailingUpload:
+            name = "release.apk"
+
+            def chunks(self):
+                yield b"partial"
+                raise OSError("write interrupted")
+
+        with TemporaryDirectory() as tmpdir:
+            download_dir = Path(tmpdir)
+            with override_settings(APK_DOWNLOAD_DIR=download_dir):
+                with self.assertRaises(OSError):
+                    _save_uploaded_apk_to_temp(FailingUpload())
+
+                temp_files = list((download_dir / "tmp").glob("apk-upload-*.apk"))
+
+        self.assertEqual(temp_files, [])
+
     def test_admin_download_endpoint_serves_apk_with_actual_filename(self):
         from tempfile import TemporaryDirectory
 

@@ -10,7 +10,7 @@ import qrcode.image.svg
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db import DatabaseError, IntegrityError, transaction
+from django.db import DatabaseError, IntegrityError, close_old_connections, transaction
 from django.http import (
     FileResponse,
     Http404,
@@ -189,13 +189,23 @@ def _finalize_apk_upload_job(job_id):
 
         apk_path = get_configured_apk_download_path()
         apk_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(temp_path), str(apk_path))
+        temp_dest = apk_path.with_name(f"{apk_path.name}.tmp")
+        shutil.move(str(temp_path), str(temp_dest))
+        temp_dest.replace(apk_path)
 
         job.status = APKUploadJob.STATUS_COMPLETED
         job.stored_path = str(apk_path)
         job.finished_at = timezone.now()
         job.save(update_fields=["status", "stored_path", "finished_at"])
     except Exception as exc:
+        try:
+            job = APKUploadJob.objects.get(pk=job_id)
+            if job.stored_path:
+                temp_path = Path(job.stored_path)
+                if temp_path.exists() and temp_path.is_file():
+                    temp_path.unlink()
+        except Exception:
+            pass
         APKUploadJob.objects.filter(pk=job_id).update(
             status=APKUploadJob.STATUS_FAILED,
             error_message=str(exc),
@@ -208,9 +218,13 @@ def _start_apk_upload_finalizer(job_id):
         _finalize_apk_upload_job(job_id)
         return
 
-    thread = threading.Thread(
-        target=_finalize_apk_upload_job, args=(job_id,), daemon=True
-    )
+    def thread_target():
+        try:
+            _finalize_apk_upload_job(job_id)
+        finally:
+            close_old_connections()
+
+    thread = threading.Thread(target=thread_target, daemon=True)
     thread.start()
 
 
@@ -218,12 +232,23 @@ def _save_uploaded_apk_to_temp(uploaded_file):
     download_dir = Path(getattr(settings, "APK_DOWNLOAD_DIR", APK_DOWNLOAD_DIR))
     temp_dir = download_dir / "tmp"
     temp_dir.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(
-        mode="wb", suffix=".apk", prefix="apk-upload-", dir=temp_dir, delete=False
-    ) as destination:
+    destination = None
+    try:
+        destination = tempfile.NamedTemporaryFile(
+            mode="wb", suffix=".apk", prefix="apk-upload-", dir=temp_dir, delete=False
+        )
         for chunk in uploaded_file.chunks():
             destination.write(chunk)
+        destination.close()
         return Path(destination.name)
+    except Exception:
+        if destination is not None:
+            destination.close()
+            try:
+                Path(destination.name).unlink(missing_ok=True)
+            except Exception:
+                pass
+        raise
 
 
 @staff_member_required
@@ -253,7 +278,19 @@ def admin_upload_helssa_apk(request):
         original_filename=Path(uploaded_file.name).name,
         created_by=request.user if request.user.is_authenticated else None,
     )
-    temp_path = _save_uploaded_apk_to_temp(uploaded_file)
+    try:
+        temp_path = _save_uploaded_apk_to_temp(uploaded_file)
+    except Exception as exc:
+        job.status = APKUploadJob.STATUS_FAILED
+        job.error_message = f"خطا در ذخیره فایل موقت: {exc}"
+        job.finished_at = timezone.now()
+        job.save(update_fields=["status", "error_message", "finished_at"])
+        error_message = "ذخیره‌سازی فایل موقت با خطا مواجه شد."
+        if is_ajax_upload:
+            return JsonResponse({"ok": False, "message": error_message}, status=500)
+        messages.error(request, error_message)
+        return HttpResponseRedirect(reverse("admin:index"))
+
     job.status = APKUploadJob.STATUS_QUEUED
     job.stored_path = str(temp_path)
     job.save(update_fields=["status", "stored_path"])
