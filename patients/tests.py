@@ -908,6 +908,8 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(response, "سوالی داری؟")
         self.assertContains(response, 'href="https://ble.ir/helssaaa"')
         self.assertContains(response, 'href="https://eitaa.ir/helssaaa"')
+        self.assertContains(response, 'href="tel:09961733668"')
+        self.assertContains(response, "تماس و پیگیری ثبت‌نام: ۰۹۹۶۱۷۳۳۶۶۸")
         self.assertContains(response, 'aria-label="پرسش از هلسا در پیام‌رسان بله"')
         self.assertContains(response, 'aria-label="پرسش از هلسا در پیام‌رسان ایتا"')
 
