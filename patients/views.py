@@ -41,7 +41,7 @@ SITE_NAME = "درمانگاه ولیعصر صغاد | پزشک خانواده د
 CANONICAL_URL = "https://register.helssa.ir/"
 ONLINE_VISIT_URL = "https://order.helssa.ir"
 SOCIAL_PROFILE_URLS = ["https://ble.ir/helssaaa", "https://eitaa.ir/helssaaa"]
-CONTACT_TELEPHONE = "09961733668"
+CONTACT_TELEPHONE = "+989961733668"
 SHARE_TITLE = "ثبت‌نام پزشک خانواده و ویزیت آنلاین | درمانگاه ولیعصر صغاد"
 SHARE_DESCRIPTION = (
     "در درمانگاه ولیعصر صغاد، ثبت‌نام پزشک خانواده دکتر حسین شبانی را آنلاین انجام دهید "
@@ -60,8 +60,14 @@ ENGAGEMENT_EVENT_TYPES = {
     VisitEvent.EVENT_FORM_START,
     VisitEvent.EVENT_FIELD_COMPLETE,
     VisitEvent.EVENT_SCROLL_DEPTH,
+    VisitEvent.EVENT_ONLINE_VISIT_CTA_CLICK,
+    VisitEvent.EVENT_ONLINE_VISIT_CARD_CTA_CLICK,
 }
 ENGAGEMENT_METADATA_KEYS = {"section", "depth", "field_name", "cta_location"}
+
+
+def _to_persian_digits(value):
+    return str(value).translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))
 
 
 def _log_analytics(request, event_type, **kwargs):
@@ -518,7 +524,7 @@ def register_patient(request):
         "contactPoint": {
             "@type": "ContactPoint",
             "telephone": CONTACT_TELEPHONE,
-            "contactType": "customer support",
+            "contactType": "customer service",
             "availableLanguage": "fa-IR",
         },
         "sameAs": SOCIAL_PROFILE_URLS,
@@ -577,6 +583,8 @@ def register_patient(request):
             "structured_data_json": json.dumps(
                 structured_data, ensure_ascii=False
             ).replace("</", "<\\/"),
+            "contact_telephone": CONTACT_TELEPHONE,
+            "contact_telephone_display": _to_persian_digits(CONTACT_TELEPHONE),
         },
     )
 
