@@ -905,13 +905,19 @@ class RegisterPatientViewTests(TestCase):
     def test_register_template_includes_bottom_social_contact_bar(self):
         response = self.client.get(reverse("patients:register"))
 
-        self.assertContains(response, "سوالی داری؟")
-        self.assertContains(response, 'href="https://ble.ir/helssaaa"')
-        self.assertContains(response, 'href="https://eitaa.ir/helssaaa"')
-        self.assertContains(response, 'href="tel:09961733668"')
-        self.assertContains(response, "تماس و پیگیری ثبت‌نام: ۰۹۹۶۱۷۳۳۶۶۸")
-        self.assertContains(response, 'aria-label="پرسش از هلسا در پیام‌رسان بله"')
-        self.assertContains(response, 'aria-label="پرسش از هلسا در پیام‌رسان ایتا"')
+        content = response.content.decode()
+        footer_start = content.index('<footer class="site-footer')
+        footer_end = content.index("</footer>", footer_start)
+        footer = content[footer_start:footer_end]
+
+        self.assertIn("تماس با ما", footer)
+        self.assertIn("سوالی داری؟", footer)
+        self.assertIn('href="https://ble.ir/helssaaa"', footer)
+        self.assertIn('href="https://eitaa.ir/helssaaa"', footer)
+        self.assertIn('href="tel:09961733668"', footer)
+        self.assertIn("تماس و پیگیری ثبت‌نام: ۰۹۹۶۱۷۳۳۶۶۸", footer)
+        self.assertIn('aria-label="پرسش از هلسا در پیام‌رسان بله"', footer)
+        self.assertIn('aria-label="پرسش از هلسا در پیام‌رسان ایتا"', footer)
 
     def test_register_template_includes_share_preview_metadata(self):
         response = self.client.get(reverse("patients:register"))
