@@ -40,12 +40,15 @@ from .forms import (
 from .views import (
     COMMUNITY_BASE_COUNT,
     CANONICAL_URL,
+    CONTACT_TELEPHONE,
     FORM_ERROR_MESSAGE,
+    ONLINE_VISIT_URL,
     SHARE_DESCRIPTION,
     SHARE_IMAGE_PATH,
     SHARE_TITLE,
     SITE_LOGO_PATH,
     SITE_NAME,
+    SOCIAL_PROFILE_URLS,
     SUCCESS_MESSAGE,
 )
 from .models import APKUploadJob, SMSMessageLog, Patient, VisitEvent
@@ -889,6 +892,21 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(response, "ثبت اطلاعات و دریافت پیگیری درمانگاه")
         self.assertContains(response, "۰ از ۴ بخش تکمیل شده")
         self.assertContains(response, "data-sticky-cta")
+        online_visit_href = reverse("patients:order_redirect")
+        self.assertContains(response, "ویزیت آنلاین")
+        self.assertContains(response, f'href="{online_visit_href}"')
+        self.assertContains(response, 'data-track-click="online_visit_cta_click"')
+        self.assertContains(response, 'data-cta-location="hero_online_visit"')
+
+    def test_register_template_includes_online_visit_card(self):
+        response = self.client.get(reverse("patients:register"))
+
+        self.assertContains(response, 'class="online-visit-card reveal reveal--delay-7"')
+        self.assertContains(response, "ویزیت آنلاین درمانگاه ولیعصر صغاد")
+        self.assertContains(response, "برای دریافت ویزیت آنلاین و پیگیری خدمات درمانی")
+        self.assertContains(response, reverse("patients:order_redirect"))
+        self.assertContains(response, "ورود به ویزیت آنلاین")
+        self.assertContains(response, 'data-track-click="online_visit_card_cta_click"')
 
     def test_register_template_includes_standard_copyright_footer(self):
         response = self.client.get(reverse("patients:register"))
@@ -899,11 +917,19 @@ class RegisterPatientViewTests(TestCase):
     def test_register_template_includes_bottom_social_contact_bar(self):
         response = self.client.get(reverse("patients:register"))
 
-        self.assertContains(response, "سوالی داری؟")
-        self.assertContains(response, 'href="https://ble.ir/helssaaa"')
-        self.assertContains(response, 'href="https://eitaa.ir/helssaaa"')
-        self.assertContains(response, 'aria-label="پرسش از هلسا در پیام‌رسان بله"')
-        self.assertContains(response, 'aria-label="پرسش از هلسا در پیام‌رسان ایتا"')
+        content = response.content.decode()
+        footer_start = content.index('<footer class="site-footer')
+        footer_end = content.index("</footer>", footer_start)
+        footer = content[footer_start:footer_end]
+
+        self.assertIn("تماس با ما", footer)
+        self.assertIn("سوالی داری؟", footer)
+        self.assertIn('href="https://ble.ir/helssaaa"', footer)
+        self.assertIn('href="https://eitaa.ir/helssaaa"', footer)
+        self.assertIn(f'href="tel:{CONTACT_TELEPHONE}"', footer)
+        self.assertIn("تماس و پیگیری ثبت‌نام: +۹۸۹۹۶۱۷۳۳۶۶۸", footer)
+        self.assertIn('aria-label="پرسش از هلسا در پیام‌رسان بله"', footer)
+        self.assertIn('aria-label="پرسش از هلسا در پیام‌رسان ایتا"', footer)
 
     def test_register_template_includes_share_preview_metadata(self):
         response = self.client.get(reverse("patients:register"))
@@ -944,12 +970,25 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(
             response, "درمانگاه ولیعصر صغاد - پزشک خانواده دکتر حسین شبانی"
         )
+        structured_data = json.loads(response.context["structured_data_json"])
+        self.assertEqual(structured_data["telephone"], CONTACT_TELEPHONE)
+        self.assertEqual(structured_data["contactPoint"]["@type"], "ContactPoint")
+        self.assertEqual(structured_data["contactPoint"]["telephone"], CONTACT_TELEPHONE)
+        self.assertEqual(structured_data["contactPoint"]["contactType"], "customer service")
+        self.assertEqual(structured_data["contactPoint"]["availableLanguage"], "fa-IR")
+        self.assertEqual(structured_data["sameAs"], SOCIAL_PROFILE_URLS)
+        self.assertEqual(structured_data["potentialAction"]["@type"], "ReserveAction")
+        self.assertEqual(structured_data["potentialAction"]["name"], "ویزیت آنلاین")
+        self.assertEqual(
+            structured_data["potentialAction"]["target"]["urlTemplate"],
+            ONLINE_VISIT_URL,
+        )
 
-    def test_order_redirects_temporarily_to_medogram(self):
+    def test_order_redirects_temporarily_to_online_visit_app(self):
         response = self.client.get("/order/")
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "https://medogram.ir")
+        self.assertEqual(response["Location"], "https://order.helssa.ir")
 
     def test_order_without_trailing_slash_uses_append_slash_redirect(self):
         response = self.client.get("/order")
@@ -1620,6 +1659,22 @@ class VisitAnalyticsEnhancedTests(TestCase):
         self.assertEqual(event.metadata, {"section": "form", "field_name": "mobile"})
         self.assertNotIn("09123456789", str(event.metadata))
         self.assertNotIn("1234567890", str(event.metadata))
+
+    def test_client_engagement_endpoint_logs_online_visit_click_event(self):
+        response = self.client.post(
+            reverse("patients:analytics_event"),
+            data=json.dumps(
+                {
+                    "event_type": VisitEvent.EVENT_ONLINE_VISIT_CTA_CLICK,
+                    "metadata": {"cta_location": "hero_online_visit"},
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        event = VisitEvent.objects.get(event_type=VisitEvent.EVENT_ONLINE_VISIT_CTA_CLICK)
+        self.assertEqual(event.metadata, {"cta_location": "hero_online_visit"})
 
     def test_client_engagement_endpoint_rejects_unknown_event(self):
         response = self.client.post(

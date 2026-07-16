@@ -9,7 +9,7 @@ urlpatterns = [
     path("", views.register_patient, name="register"),
     path(
         "order/",
-        RedirectView.as_view(url="https://medogram.ir", permanent=False),
+        RedirectView.as_view(url="https://order.helssa.ir", permanent=False),
         name="order_redirect",
     ),
     path(

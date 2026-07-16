@@ -37,12 +37,15 @@ SUCCESS_MESSAGE = (
 )
 FORM_ERROR_MESSAGE = "ثبت‌نام انجام نشد. لطفاً خطاهای فرم را اصلاح کنید."
 SAVE_ERROR = "در ذخیره‌سازی اطلاعات مشکلی رخ داد. لطفاً دوباره تلاش کنید."
-SITE_NAME = "سامانه ثبت نام پزشک خانواده دکتر حسین شبانی"
+SITE_NAME = "درمانگاه ولیعصر صغاد | پزشک خانواده دکتر حسین شبانی"
 CANONICAL_URL = "https://register.helssa.ir/"
-SHARE_TITLE = "ثبت‌نام پزشک خانواده صغاد | دکتر حسین شبانی | درمانگاه ولیعصر"
+ONLINE_VISIT_URL = "https://order.helssa.ir"
+SOCIAL_PROFILE_URLS = ["https://ble.ir/helssaaa", "https://eitaa.ir/helssaaa"]
+CONTACT_TELEPHONE = "+989961733668"
+SHARE_TITLE = "ثبت‌نام پزشک خانواده و ویزیت آنلاین | درمانگاه ولیعصر صغاد"
 SHARE_DESCRIPTION = (
-    "ثبت‌نام اینترنتی پزشک خانواده دکتر حسین شبانی در درمانگاه ولیعصر صغاد؛ "
-    "تعرفه دولتی، پیگیری سلامت خانواده و پاسخگویی آنلاین برای ثبت‌نام‌شدگان."
+    "در درمانگاه ولیعصر صغاد، ثبت‌نام پزشک خانواده دکتر حسین شبانی را آنلاین انجام دهید "
+    "و برای پیگیری سلامت خانواده از امکان ویزیت آنلاین استفاده کنید."
 )
 SHARE_IMAGE_PATH = "patients/images/share-logo.png"
 SITE_LOGO_PATH = "patients/images/site-logo.png"
@@ -57,8 +60,14 @@ ENGAGEMENT_EVENT_TYPES = {
     VisitEvent.EVENT_FORM_START,
     VisitEvent.EVENT_FIELD_COMPLETE,
     VisitEvent.EVENT_SCROLL_DEPTH,
+    VisitEvent.EVENT_ONLINE_VISIT_CTA_CLICK,
+    VisitEvent.EVENT_ONLINE_VISIT_CARD_CTA_CLICK,
 }
 ENGAGEMENT_METADATA_KEYS = {"section", "depth", "field_name", "cta_location"}
+
+
+def _to_persian_digits(value):
+    return str(value).translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))
 
 
 def _log_analytics(request, event_type, **kwargs):
@@ -508,9 +517,30 @@ def register_patient(request):
         "@type": "MedicalClinic",
         "name": "درمانگاه ولیعصر صغاد - پزشک خانواده دکتر حسین شبانی",
         "url": CANONICAL_URL,
+        "telephone": CONTACT_TELEPHONE,
         "areaServed": "صغاد، آباده، فارس",
         "medicalSpecialty": "PrimaryCare",
         "description": SHARE_DESCRIPTION,
+        "contactPoint": {
+            "@type": "ContactPoint",
+            "telephone": CONTACT_TELEPHONE,
+            "contactType": "customer service",
+            "availableLanguage": "fa-IR",
+        },
+        "sameAs": SOCIAL_PROFILE_URLS,
+        "potentialAction": {
+            "@type": "ReserveAction",
+            "name": "ویزیت آنلاین",
+            "target": {
+                "@type": "EntryPoint",
+                "urlTemplate": ONLINE_VISIT_URL,
+                "inLanguage": "fa-IR",
+                "actionPlatform": [
+                    "https://schema.org/DesktopWebPlatform",
+                    "https://schema.org/MobileWebPlatform",
+                ],
+            },
+        },
         "physician": {
             "@type": "Physician",
             "name": "دکتر حسین شبانی",
@@ -553,6 +583,8 @@ def register_patient(request):
             "structured_data_json": json.dumps(
                 structured_data, ensure_ascii=False
             ).replace("</", "<\\/"),
+            "contact_telephone": CONTACT_TELEPHONE,
+            "contact_telephone_display": _to_persian_digits(CONTACT_TELEPHONE),
         },
     )
 
