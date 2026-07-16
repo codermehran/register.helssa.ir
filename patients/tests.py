@@ -896,6 +896,16 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(response, reverse("patients:order_redirect"))
         self.assertContains(response, 'data-track-click="online_visit_cta_click"')
 
+    def test_register_template_includes_online_visit_card(self):
+        response = self.client.get(reverse("patients:register"))
+
+        self.assertContains(response, 'class="online-visit-card reveal reveal--delay-7"')
+        self.assertContains(response, "ویزیت آنلاین درمانگاه ولیعصر صغاد")
+        self.assertContains(response, "برای دریافت ویزیت آنلاین و پیگیری خدمات درمانی")
+        self.assertContains(response, reverse("patients:order_redirect"))
+        self.assertContains(response, "ورود به ویزیت آنلاین")
+        self.assertContains(response, 'data-track-click="online_visit_card_cta_click"')
+
     def test_register_template_includes_standard_copyright_footer(self):
         response = self.client.get(reverse("patients:register"))
 

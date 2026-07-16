@@ -154,6 +154,26 @@
             </div>
         </section>
 
+        <section
+            class="online-visit-card reveal reveal--delay-7"
+            aria-labelledby="online-visit-title"
+            data-track-section="online-visit"
+        >
+            <div class="online-visit-card__copy">
+                <p class="eyebrow">ویزیت آنلاین</p>
+                <h2 id="online-visit-title">ویزیت آنلاین درمانگاه ولیعصر صغاد</h2>
+                <p>برای دریافت ویزیت آنلاین و پیگیری خدمات درمانی، وارد وب‌اپ هلسا شوید.</p>
+            </div>
+            <a
+                class="online-visit-card__button"
+                href="{% url 'patients:order_redirect' %}"
+                data-track-click="online_visit_card_cta_click"
+                data-cta-location="online_visit_card"
+            >
+                ورود به ویزیت آنلاین
+            </a>
+        </section>
+
         <section class="flow-section" aria-labelledby="flow-title" data-track-section="flow">
             <div class="flow-section__copy reveal">
                 <p class="eyebrow">مسیر ثبت‌نام</p>
