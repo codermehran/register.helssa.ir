@@ -892,6 +892,9 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(response, "ثبت اطلاعات و دریافت پیگیری درمانگاه")
         self.assertContains(response, "۰ از ۴ بخش تکمیل شده")
         self.assertContains(response, "data-sticky-cta")
+        self.assertContains(response, "ویزیت آنلاین")
+        self.assertContains(response, reverse("patients:order_redirect"))
+        self.assertContains(response, 'data-track-click="online_visit_cta_click"')
 
     def test_register_template_includes_standard_copyright_footer(self):
         response = self.client.get(reverse("patients:register"))
@@ -956,11 +959,11 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(response, '"name": "ویزیت آنلاین"')
         self.assertContains(response, f'"urlTemplate": "{ONLINE_VISIT_URL}"')
 
-    def test_order_redirects_temporarily_to_medogram(self):
+    def test_order_redirects_temporarily_to_online_visit_app(self):
         response = self.client.get("/order/")
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "https://medogram.ir")
+        self.assertEqual(response["Location"], "https://order.helssa.ir")
 
     def test_order_without_trailing_slash_uses_append_slash_redirect(self):
         response = self.client.get("/order")
