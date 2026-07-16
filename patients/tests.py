@@ -40,12 +40,15 @@ from .forms import (
 from .views import (
     COMMUNITY_BASE_COUNT,
     CANONICAL_URL,
+    CONTACT_TELEPHONE,
     FORM_ERROR_MESSAGE,
+    ONLINE_VISIT_URL,
     SHARE_DESCRIPTION,
     SHARE_IMAGE_PATH,
     SHARE_TITLE,
     SITE_LOGO_PATH,
     SITE_NAME,
+    SOCIAL_PROFILE_URLS,
     SUCCESS_MESSAGE,
 )
 from .models import APKUploadJob, SMSMessageLog, Patient, VisitEvent
@@ -944,6 +947,14 @@ class RegisterPatientViewTests(TestCase):
         self.assertContains(
             response, "درمانگاه ولیعصر صغاد - پزشک خانواده دکتر حسین شبانی"
         )
+        self.assertContains(response, f'"telephone": "{CONTACT_TELEPHONE}"')
+        self.assertContains(response, '"@type": "ContactPoint"')
+        self.assertContains(response, '"availableLanguage": "fa-IR"')
+        for social_url in SOCIAL_PROFILE_URLS:
+            self.assertContains(response, social_url)
+        self.assertContains(response, '"@type": "ReserveAction"')
+        self.assertContains(response, '"name": "ویزیت آنلاین"')
+        self.assertContains(response, f'"urlTemplate": "{ONLINE_VISIT_URL}"')
 
     def test_order_redirects_temporarily_to_medogram(self):
         response = self.client.get("/order/")
