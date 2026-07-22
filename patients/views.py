@@ -31,7 +31,7 @@ SHARE_DESCRIPTION = (
 )
 SHARE_IMAGE_PATH = "patients/images/share-logo.png"
 SITE_LOGO_PATH = "patients/images/site-logo.png"
-COMMUNITY_BASE_COUNT = 1008
+COMMUNITY_BASE_COUNT = 1333
 ENGAGEMENT_EVENT_TYPES = {
     VisitEvent.EVENT_HERO_CTA_CLICK,
     VisitEvent.EVENT_STICKY_CTA_CLICK,
