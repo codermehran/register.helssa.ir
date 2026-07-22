@@ -15,5 +15,6 @@ venv/
 
 # Environment variables
 .env
+er.txt
 #codex
 .codex-remote-attachments/
